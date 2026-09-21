@@ -27,7 +27,7 @@ cheap test print; print "fit to page".
 Any recent Chromium/Chrome works (the page size is set via CSS `@page`):
 
 ```bash
-cd posters
+cd docs/posters
 for p in poster-*.html; do
   chromium --headless --no-pdf-header-footer --print-to-pdf="${p%.html}.pdf" "$p"
 done

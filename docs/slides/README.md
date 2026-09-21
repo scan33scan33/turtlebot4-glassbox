@@ -43,11 +43,11 @@ as the posters. If those change, update the deck.
 
 ```bash
 # from anywhere — just open the file
-xdg-open slides/maker-faire.html          # Linux
-open slides/maker-faire.html              # macOS
+xdg-open docs/slides/maker-faire.html      # Linux
+open docs/slides/maker-faire.html          # macOS
 
 # or serve it (useful on the booth laptop / phone cast)
-python3 -m http.server 8000 --directory slides
+python3 -m http.server 8000 --directory docs/slides
 # → http://localhost:8000/maker-faire.html
 ```
 

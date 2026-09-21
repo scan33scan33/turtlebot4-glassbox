@@ -147,9 +147,7 @@ to localhost only, change `app.run(host='0.0.0.0', ...)` to `host='127.0.0.1'`.
   themselves are Release assets fetched by `scripts/download_models.sh`, not
   committed; source `.pt` weights are gitignored (ultralytics re-downloads them)
 - `scripts/download_models.sh` — fetch + SHA-256 verify the OAK blobs
-- `docs/operations.md` — operational notes (`/cmd_vel` recovery, OAK gotchas)
-- `posters/` — Maker Faire 18×24" booth posters (public + algorithms)
-- `slides/` — Maker Faire HTML slideshow (semi-technical booth talk)
+- `docs/` — `operations.md` (operational notes: `/cmd_vel` recovery, OAK gotchas) plus the Maker Faire materials: `docs/posters/` (18×24" booth posters, public + algorithms) and `docs/slides/` (HTML slideshow for a semi-technical booth talk)
 - `templates/index.html` — web UI source (extracted from `tb4_claude_nav.py:_HTML` for lintability)
 - `goal_cycle.py` / `goal_run.py` — standalone chime + drive-leg loop, driven off
   nav's `/state` (a shuttle test used to validate `/cmd_vel` end-to-end; not
