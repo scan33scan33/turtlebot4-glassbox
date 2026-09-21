@@ -1,0 +1,13 @@
+# name: open_explore
+# description: roam toward the most open space, avoiding obstacles
+# triggers: explore, open explore, roam, wander, find open space, explore the room, go explore, find space
+# plan: pick the emptiest nearby spot@EXPLORE | drive there avoiding obstacles@EXPLORE
+#
+# Repeatedly heads to the emptiest nearby spot — the point on a ~2 m ring around
+# the robot with the FEWEST lidar returns near it (most open) — and drives there
+# in obstacle-aware move mode, so it roams into open areas without hitting things.
+# Runs until you press Stop.
+
+PRINT "Exploring — heading for open space. Press Stop to end."
+SET r = EXPLORE()
+PRINT "Done exploring."

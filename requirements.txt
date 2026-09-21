@@ -1,0 +1,25 @@
+# Runtime + test dependencies for the navigator, the DSL and the offline tests.
+#
+#   pip install -r requirements.txt
+#
+# This covers everything that runs WITHOUT hardware: tests/test_push_to_goal.py,
+# toyscript.py program runs, and dataset_tools.py. On the robot you also need
+# ROS 2 Jazzy (rclpy, sensor_msgs, nav_msgs, geometry_msgs, vision_msgs,
+# irobot_create_msgs, builtin_interfaces) and depthai for the OAK-D -- those come
+# from the ROS apt install and the TurtleBot 4 image, NOT from pip.
+#
+# On the Pi, cv2 usually already exists as the apt package python3-opencv; if so
+# you can drop opencv-python-headless here to avoid a second copy.
+
+flask>=3.0
+numpy>=1.24
+opencv-python-headless>=4.8   # or opencv-python if you want the GUI bindings
+
+# dataset_tools.py --video also shells out to `ffmpeg` (optional; it falls back
+# to OpenCV's mp4v writer when ffmpeg is missing). Install it from your package
+# manager, not pip.
+
+# Training only -- NOT needed to run the robot. See training/README.md and
+# objdet18/README.md. NOTE: ultralytics is AGPL-3.0, which is why it is kept out
+# of the default install. See NOTICE for what that means for the model blobs.
+#   pip install "ultralytics>=8.1"

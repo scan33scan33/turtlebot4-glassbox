@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Poster — Meet the Robot (for everyone)</title>
+<style>
+  @page { size: 18in 24in; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 18in; height: 24in; }
+  body {
+    font-family: "Liberation Sans", "DejaVu Sans", sans-serif;
+    background: #F7F1E1;
+    color: #14213D;
+    position: relative;
+    overflow: hidden;
+  }
+  .edge { position: absolute; left: 0; right: 0; height: 0.32in; background: #E23A2E; z-index: 5; }
+  .edge.top { top: 0; }
+  .edge.bottom { bottom: 0; }
+
+  .content { position: absolute; top: 0.32in; bottom: 0.32in; left: 0; right: 0; padding: 0.65in 1.0in 0.55in; display: flex; flex-direction: column; overflow: hidden; }
+
+  .eyebrow {
+    display: flex; align-items: center; gap: 0.25in;
+    font-size: 0.32in; font-weight: bold; letter-spacing: 0.12in;
+    text-transform: uppercase; color: #E23A2E;
+  }
+  .eyebrow .rule { flex: 1; height: 0.06in; background: #E23A2E; }
+
+  h1 {
+    font-size: 1.06in; line-height: 1.04; letter-spacing: -0.02in;
+    text-transform: uppercase; margin-top: 0.18in;
+  }
+  h1 .accent { color: #E23A2E; display: block; }
+
+  .tagline { font-size: 0.42in; line-height: 1.35; margin-top: 0.24in; }
+  .tagline b { color: #E23A2E; }
+
+  .hero { flex: 1; min-height: 0; position: relative; margin-top: 0.05in; }
+  .hero svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .looprow { display: flex; gap: 0.3in; flex: none; }
+  .loopcard {
+    flex: 1; background: #FFFFFF; border: 0.045in solid #14213D; border-radius: 0.22in;
+    padding: 0.26in 0.3in; box-shadow: 0.1in 0.1in 0 #14213D;
+  }
+  .loopcard .tag {
+    display: inline-block; font-size: 0.3in; font-weight: bold; letter-spacing: 0.06in;
+    text-transform: uppercase; padding: 0.08in 0.22in; border-radius: 0.3in; margin-bottom: 0.14in;
+  }
+  .see  .tag { background: #1B9AAA; color: #FFFFFF; }
+  .plan .tag { background: #FFB627; color: #3A2800; }
+  .move .tag { background: #E23A2E; color: #FFFFFF; }
+  .loopcard p { font-size: 0.3in; line-height: 1.4; color: #45536F; }
+  .loopcard p b { color: #14213D; }
+
+  .sayrow { display: flex; gap: 0.3in; margin-top: 0.34in; flex: none; }
+  .saycard {
+    flex: 1; background: #14213D; color: #F7F1E1; border-radius: 0.22in;
+    padding: 0.3in 0.34in; display: flex; flex-direction: column;
+  }
+  .saycard h3 { font-size: 0.4in; margin-bottom: 0.12in; color: #FFD57A; }
+  .saycard p { font-size: 0.295in; line-height: 1.4; color: #C6D2E8; }
+  .saycard p b { color: #F7F1E1; }
+  .saycard .say {
+    margin-top: auto; padding-top: 0.18in;
+    font-size: 0.3in; font-weight: bold; color: #FFB627;
+  }
+  .saycard .say small { display: block; color: #7E93BC; font-weight: normal; font-size: 0.24in; margin-bottom: 0.05in; }
+
+  .footerband {
+    margin-top: 0.34in; flex: none;
+    display: flex; align-items: center; gap: 0.4in;
+    background: #14213D; color: #F7F1E1;
+    border-radius: 0.22in; padding: 0.34in 0.55in;
+  }
+  .dots { display: flex; gap: 0.18in; }
+  .dot { width: 0.44in; height: 0.44in; border-radius: 50%; background: #3DDC84; box-shadow: 0 0 0.15in rgba(61,220,132,.55); }
+  .golabel { font-size: 0.46in; font-weight: bold; white-space: nowrap; }
+  .golabel small { display: block; font-size: 0.25in; font-weight: normal; color: #9FB3D9; margin-top: 0.05in; white-space: normal; }
+  .spacer { flex: 1; }
+  .creds { text-align: right; font-size: 0.27in; line-height: 1.5; color: #9FB3D9; flex: none; }
+  .creds b { color: #F7F1E1; }
+</style>
+</head>
+<body>
+  <div class="edge top"></div>
+  <div class="edge bottom"></div>
+  <div class="content">
+    <div class="eyebrow"><span>Maker Faire Demo</span><span class="rule"></span><span>A Glass-Box Robot</span></div>
+
+    <h1>Tell it what to do. <span class="accent">Watch it think.</span></h1>
+
+    <p class="tagline"><b>No joystick. No remote control. No cloud.</b> Say the words — this
+    robot ranks its <b>library of preprogrammed behaviors</b>, picks the best match, and does
+    the whole job itself, showing its thinking <b>live on screen</b> as it works.</p>
+
+    <div class="hero">
+      <svg viewBox="0 220 1550 930" preserveAspectRatio="xMidYMid meet">
+        <!-- ground shadow -->
+        <ellipse cx="775" cy="1020" rx="430" ry="42" fill="#14213D" opacity="0.10"/>
+
+        <!-- ===== robot, side profile ===== -->
+        <path d="M 405 950 Q 400 870 470 850 L 1080 850 Q 1150 870 1145 950 Q 1150 985 1090 990 L 460 990 Q 400 985 405 950 Z" fill="#E9E9EC" stroke="#14213D" stroke-width="7"/>
+        <rect x="440" y="905" width="670" height="26" rx="13" fill="#E23A2E" opacity="0.9"/>
+        <circle cx="580" cy="985" r="52" fill="#14213D"/>
+        <circle cx="580" cy="985" r="22" fill="#4A5878"/>
+        <circle cx="970" cy="985" r="52" fill="#14213D"/>
+        <circle cx="970" cy="985" r="22" fill="#4A5878"/>
+        <path d="M 405 950 Q 400 870 470 850 L 500 850 L 500 990 L 460 990 Q 400 985 405 950 Z" fill="#C9CDD6" stroke="#14213D" stroke-width="7"/>
+
+        <rect x="540" y="760" width="18" height="90" fill="#14213D"/>
+        <rect x="990" y="760" width="18" height="90" fill="#14213D"/>
+        <rect x="470" y="720" width="610" height="44" rx="18" fill="#14213D"/>
+
+        <rect x="640" y="770" width="270" height="66" rx="10" fill="#1B9AAA" stroke="#14213D" stroke-width="6"/>
+        <rect x="660" y="786" width="40" height="34" rx="6" fill="#F7F1E1"/>
+        <rect x="712" y="786" width="40" height="34" rx="6" fill="#F7F1E1"/>
+        <rect x="766" y="786" width="70" height="34" rx="6" fill="#0F6672"/>
+
+        <rect x="560" y="640" width="180" height="52" rx="16" fill="#3A3F52" stroke="#14213D" stroke-width="6"/>
+        <rect x="588" y="600" width="124" height="48" rx="14" fill="#E23A2E" stroke="#14213D" stroke-width="6"/>
+        <g stroke="#E23A2E" stroke-width="6" stroke-linecap="round" opacity="0.75">
+          <line x1="560" y1="620" x2="360" y2="600"/>
+          <line x1="560" y1="608" x2="390" y2="540"/>
+          <line x1="740" y1="608" x2="910" y2="540"/>
+          <line x1="740" y1="620" x2="940" y2="600"/>
+        </g>
+
+        <rect x="962" y="520" width="26" height="204" rx="10" fill="#14213D"/>
+        <rect x="880" y="440" width="220" height="92" rx="26" fill="#14213D"/>
+        <circle cx="930" cy="486" r="26" fill="#F7F1E1"/>
+        <circle cx="930" cy="486" r="12" fill="#1B9AAA"/>
+        <circle cx="1050" cy="486" r="26" fill="#F7F1E1"/>
+        <circle cx="1050" cy="486" r="12" fill="#1B9AAA"/>
+        <circle cx="990" cy="486" r="16" fill="#E23A2E"/>
+        <path d="M 1100 470 L 1350 380 L 1350 600 L 1100 510 Z" fill="#FFB627" opacity="0.30"/>
+
+        <circle cx="1300" cy="560" r="52" fill="#E23A2E" stroke="#14213D" stroke-width="7"/>
+        <path d="M 1248 560 Q 1300 520 1352 560" fill="none" stroke="#14213D" stroke-width="6"/>
+        <path d="M 1248 560 Q 1300 600 1352 560" fill="none" stroke="#14213D" stroke-width="6"/>
+        <g stroke="#14213D" stroke-width="6" fill="none" stroke-dasharray="20 14">
+          <rect x="1230" y="490" width="140" height="140" rx="8"/>
+        </g>
+        <text x="1232" y="470" font-family="DejaVu Sans Mono, monospace" font-size="34" font-weight="bold" fill="#14213D">ball 0.93</text>
+
+        <!-- ===== callouts ===== -->
+        <g font-family="Liberation Sans, sans-serif">
+          <g>
+            <line x1="990" y1="428" x2="990" y2="330" stroke="#14213D" stroke-width="5"/>
+            <circle cx="990" cy="428" r="10" fill="#14213D"/>
+            <text x="990" y="270" text-anchor="middle" font-size="46" font-weight="bold" fill="#14213D">OAK-D Lite stereo camera</text>
+            <text x="990" y="320" text-anchor="middle" font-size="36" fill="#5B6B8C">runs YOLO on its own VPU — 80 object classes + depth</text>
+          </g>
+          <g>
+            <line x1="650" y1="590" x2="560" y2="450" stroke="#14213D" stroke-width="5"/>
+            <circle cx="650" cy="590" r="10" fill="#14213D"/>
+            <text x="540" y="390" text-anchor="middle" font-size="46" font-weight="bold" fill="#14213D">RPLIDAR</text>
+            <text x="540" y="438" text-anchor="middle" font-size="36" fill="#5B6B8C">a spinning lidar that maps the room 360°</text>
+          </g>
+          <g>
+            <line x1="640" y1="800" x2="490" y2="770" stroke="#14213D" stroke-width="5"/>
+            <circle cx="640" cy="800" r="10" fill="#14213D"/>
+            <text x="470" y="720" text-anchor="end" font-size="46" font-weight="bold" fill="#14213D">Raspberry Pi 4</text>
+            <text x="470" y="768" text-anchor="end" font-size="36" fill="#5B6B8C">the brain — ROS 2 + web UI</text>
+          </g>
+          <g>
+            <line x1="1145" y1="930" x2="1265" y2="965" stroke="#14213D" stroke-width="5"/>
+            <circle cx="1145" cy="930" r="10" fill="#14213D"/>
+            <text x="1290" y="1010" text-anchor="middle" font-size="44" font-weight="bold" fill="#14213D">iRobot Create 3</text>
+            <text x="1290" y="1056" text-anchor="middle" font-size="36" fill="#5B6B8C">the wheels (yes, it's</text>
+            <text x="1290" y="1098" text-anchor="middle" font-size="36" fill="#5B6B8C">a Roomba cousin)</text>
+          </g>
+          <g>
+            <rect x="150" y="880" width="130" height="220" rx="22" fill="#14213D"/>
+            <rect x="168" y="912" width="94" height="140" rx="8" fill="#1B9AAA"/>
+            <circle cx="215" cy="1074" r="12" fill="#F7F1E1"/>
+            <circle cx="192" cy="940" r="10" fill="#3DDC84"/>
+            <circle cx="215" cy="940" r="10" fill="#3DDC84"/>
+            <circle cx="238" cy="940" r="10" fill="#3DDC84"/>
+            <text x="215" y="850" text-anchor="middle" font-size="40" font-weight="bold" fill="#14213D">its mind, live on a phone</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="looprow">
+      <div class="loopcard see">
+        <span class="tag">1 · See</span>
+        <p>The same kind of <b>AI vision as a self-driving car</b>: a neural net spots
+        <b>80 kinds of objects</b>, ~6× a second, and judges distance with two lenses.</p>
+      </div>
+      <div class="loopcard plan">
+        <span class="tag">2 · Plan</span>
+        <p><b>No map is given.</b> It draws the room's floor plan from scratch with lidar,
+        and the classic <b>A* algorithm</b> plots the safest route — <b>3 fresh plans a second</b>.</p>
+      </div>
+      <div class="loopcard move">
+        <span class="tag">3 · Move</span>
+        <p>It chases a <b>sliding point ahead on its route</b> — that's why the driving looks
+        <b>smooth, not robotic</b> — and it <b>reroutes</b> the moment something blocks the way.</p>
+      </div>
+    </div>
+
+    <div class="sayrow">
+      <div class="saycard">
+        <h3>Push the ball to the wall</h3>
+        <p>The crowd favorite: it <b>hunts the ball down</b>, lines up behind it, and
+        shoves it home until it <b>feels the ball pin</b> — using nothing but its eyes.</p>
+        <div class="say"><small>Say:</small>"push the ball to the wall"</div>
+      </div>
+      <div class="saycard">
+        <h3>Follow me</h3>
+        <p>It <b>locks onto the nearest person</b> and tags along at a polite
+        <b>1-meter distance</b> — it will never drive into you. Works on dogs too.</p>
+        <div class="say"><small>Say:</small>"follow me" · "follow the dog"</div>
+      </div>
+      <div class="saycard">
+        <h3>Explore the room</h3>
+        <p>Set it loose: it <b>finds the emptiest open space</b>, drives there, and
+        repeats — roaming the whole room <b>without hitting a thing</b>.</p>
+        <div class="say"><small>Say:</small>"go explore"</div>
+      </div>
+    </div>
+
+    <div class="footerband">
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <div class="golabel">3 green dots = go
+        <small>camera · lidar · wheels — the robot checks its own health before every run</small>
+      </div>
+      <div class="spacer"></div>
+      <div class="creds"><b>github.com/scan33scan33/turtlebot4-glassbox</b><br>open source · Poster 1 of 2 · For Everyone</div>
+    </div>
+  </div>
+</body>
+</html>

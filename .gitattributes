@@ -1,0 +1,9 @@
+# Binary assets — don't diff, don't merge
+*.blob binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.onnx binary
+*.pt binary
+*.zip binary

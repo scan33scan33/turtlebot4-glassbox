@@ -1,0 +1,14 @@
+# name: follow
+# description: follow anything you name from the COCO list (person, dog, cat, bottle, chair, cup...)
+# triggers: follow the, follow that, follow it, come with me, keep near it, trail the, tail the, stay with, keep close to
+# plan: locate the target@FOLLOW | trail it at a safe distance@FOLLOW
+#
+# Generic follow: say "follow the <object>" for any COCO class (synonyms like
+# couch/tv/table understood). Trails the closest one at a safe standoff — move
+# mode, obstacle-aware, never pushes — and turns to re-find it if it leaves view.
+# The target is parsed from your command (pushing stays ball-only; the robot
+# can't push arbitrary objects). Runs until Stop.
+
+PRINT "Following — press Stop to end."
+SET r = FOLLOW("person", 1.0)
+PRINT "Stopped following."

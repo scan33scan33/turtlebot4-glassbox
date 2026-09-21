@@ -1,0 +1,94 @@
+THIRD-PARTY COMPONENTS AND LICENSES
+===================================
+
+The source code in this repository is licensed under the MIT License (see
+LICENSE). That covers the navigator, the task DSL, the web UI, the tests and
+the tooling -- i.e. everything written for this project.
+
+Some third-party components shipped alongside or used by this project carry
+DIFFERENT and, in one case, MORE RESTRICTIVE terms. MIT does not and cannot
+relicense them. Read this before you redistribute, fork, or build a product on
+this repository.
+
+
+1. Ultralytics YOLO -- AGPL-3.0  (IMPORTANT)
+--------------------------------------------
+Ultralytics YOLO (YOLOv5u / YOLOv8 / YOLOv9 and the `ultralytics` Python
+package) is published by Ultralytics under the GNU Affero General Public
+License v3.0, with a separate commercial Enterprise License offered for users
+who cannot comply with AGPL-3.0.
+
+    https://github.com/ultralytics/ultralytics
+    https://www.ultralytics.com/license
+
+This affects two things here:
+
+  (a) The prebuilt model blobs fetched into `models/`:
+
+          yolov5mu_416_5shave.blob      (from Ultralytics YOLOv5mu)
+          yolov8s_416_fixed_6shave.blob (from Ultralytics YOLOv8s)
+
+      These are compiled OpenVINO/RVC2 exports of Ultralytics-trained weights.
+      They are best understood as derivative works of AGPL-3.0 material, NOT as
+      MIT-licensed files. The MIT LICENSE file does not apply to them.
+
+      They are NOT committed to this repository. They are published as GitHub
+      Release assets and downloaded by `scripts/download_models.sh`, so the
+      repository tree itself is MIT throughout. Downloading a blob, running it,
+      and building on it are still governed by Ultralytics' terms, not by this
+      project's licence.
+
+  (b) The training and export scripts that import `ultralytics`:
+
+          training/train.py, training/autolabel.py, training/export_for_oak.py
+          objdet18/train.py
+
+      Running these locally is ordinary use. Distributing a combined work built
+      on them may pull you into AGPL-3.0 obligations.
+
+Note that the navigator itself (`tb4_claude_nav.py`) does NOT import
+`ultralytics` at runtime -- inference happens on the OAK-D's VPU from a
+compiled blob -- which is why `ultralytics` is not in the default
+`requirements.txt` install.
+
+AGPL-3.0 is a network-copyleft license: serving a modified version over a
+network can trigger the obligation to offer corresponding source. If you intend
+to use this commercially or in a closed-source product, review the Ultralytics
+license terms and consider their Enterprise License, or retrain and export a
+detector from a permissively licensed architecture instead.
+
+
+2. Training datasets
+--------------------
+`objdet18/` and `training/` download public datasets that are NOT redistributed
+here, and that carry their own terms:
+
+  - COCO 2017 (https://cocodataset.org/#termsofuse) -- annotations are CC BY
+    4.0; the underlying images are Flickr-hosted under a range of individual
+    licenses. COCO's terms do not grant blanket rights to the images.
+  - Objects365 (https://www.objects365.org/) -- see their site for the current
+    terms of use; historically distributed for academic/research use.
+
+No dataset images or annotations are committed to this repository. You download
+them yourself and are responsible for complying with their terms.
+
+
+3. Platform software (not vendored here)
+----------------------------------------
+Installed separately, listed for completeness:
+
+  - ROS 2 Jazzy and the TurtleBot 4 / Create 3 packages -- Apache-2.0
+  - Luxonis DepthAI and `blobconverter` -- MIT
+  - Flask (BSD-3-Clause), NumPy (BSD-3-Clause), OpenCV (Apache-2.0 for 4.5.0+)
+
+
+Summary
+-------
+Project code: MIT, use it freely.
+`models/*.blob`: not in this repo; fetched from a Release and derived from
+AGPL-3.0 Ultralytics weights -- AGPL terms apply to them.
+Datasets: each has its own terms; none are redistributed here.
+
+This file is a good-faith summary for downstream users, not legal advice. If
+the distinction matters for your use case, confirm it against the upstream
+licenses linked above.

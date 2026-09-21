@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Poster — Under the Hood (the algorithms)</title>
+<style>
+  @page { size: 18in 24in; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 18in; height: 24in; }
+  body {
+    font-family: "Liberation Sans", "DejaVu Sans", sans-serif;
+    background: #14213D;
+    color: #F7F1E1;
+    position: relative;
+    overflow: hidden;
+  }
+  .edge { position: absolute; left: 0; right: 0; height: 0.32in; background: #FFB627; z-index: 5; }
+  .edge.top { top: 0; }
+  .edge.bottom { bottom: 0; }
+
+  .content { position: absolute; top: 0.32in; bottom: 0.32in; left: 0; right: 0; padding: 0.5in 0.9in 0.42in; display: flex; flex-direction: column; overflow: hidden; }
+
+  .eyebrow {
+    display: flex; align-items: center; gap: 0.25in;
+    font-size: 0.3in; font-weight: bold; letter-spacing: 0.11in;
+    text-transform: uppercase; color: #FFB627;
+  }
+  .eyebrow .rule { flex: 1; height: 0.055in; background: #FFB627; }
+
+  h1 {
+    font-size: 1.15in; line-height: 1; letter-spacing: -0.02in;
+    text-transform: uppercase; margin-top: 0.14in;
+  }
+  h1 .accent { color: #FFB627; }
+
+  .tagline { font-size: 0.34in; line-height: 1.35; margin-top: 0.18in; color: #C6D2E8; }
+  .tagline b { color: #F7F1E1; }
+
+  .grid {
+    flex: none; margin-top: 0.18in;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto;
+    gap: 0.2in;
+  }
+  .panel {
+    background: #1D2C50; border: 0.04in solid #34497B; border-radius: 0.2in;
+    padding: 0.24in 0.3in; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel h3 { font-size: 0.38in; margin-bottom: 0.04in; display: flex; align-items: center; gap: 0.16in; flex: none; }
+  .num {
+    width: 0.5in; height: 0.5in; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: #FFB627; color: #3A2800; font-size: 0.28in; font-weight: bold;
+  }
+  .panel h3 .t { color: #FFD57A; }
+  .sub { font-size: 0.25in; font-style: italic; color: #7E93BC; margin: 0 0 0.11in 0.66in; flex: none; }
+  .panel p { font-size: 0.265in; line-height: 1.36; color: #C6D2E8; }
+  .panel p b { color: #F7F1E1; }
+  .panel p + p { margin-top: 0.09in; }
+  .panel .src { margin-top: auto; padding-top: 0.09in; font-size: 0.21in; color: #7E93BC; font-family: "DejaVu Sans Mono", monospace; flex: none; }
+
+  pre {
+    font-family: "DejaVu Sans Mono", monospace;
+    background: #0F1830; border-radius: 0.14in;
+    padding: 0.15in 0.22in; margin: 0.09in 0;
+    font-size: 0.23in; line-height: 1.38; color: #E8EDF7;
+    overflow: hidden; white-space: pre; flex: none;
+  }
+  .kw { color: #FFB627; font-weight: bold; }
+  .fn { color: #6BD9E8; }
+  .str { color: #9CE29C; }
+  .cm { color: #7E93BC; }
+  .hl { color: #FF8B7E; }
+
+  .hack { font-size: 0.225in; line-height: 1.32; color: #C6D2E8; padding-left: 0.32in; position: relative; flex: none; }
+  .hack + .hack { margin-top: 0.09in; }
+  .hack::before { content: "▸"; position: absolute; left: 0.02in; color: #FFB627; }
+  .hack b { color: #F7F1E1; }
+
+  .charttitle { font-size: 0.24in; color: #C6D2E8; margin: 0.07in 0 0; flex: none; }
+  .legend { display: flex; gap: 0.32in; font-size: 0.24in; color: #C6D2E8; margin-bottom: 0.05in; flex: none; }
+  .legend .key { display: flex; align-items: center; gap: 0.1in; }
+  .legend .sw { width: 0.24in; height: 0.24in; border-radius: 0.05in; }
+  .chart { flex: none; width: 100%; height: 1.45in; }
+
+  .strip {
+    flex: none; margin-top: auto; padding-top: 0;
+    background: #1D2C50; border: 0.04in solid #34497B; border-radius: 0.2in;
+    padding: 0.16in 0.3in; display: flex; gap: 0.32in; align-items: center;
+  }
+  .rpgmap { flex: none; width: 1.95in; height: 1.42in; }
+  .strip h3 { font-size: 0.34in; color: #FFD57A; margin-bottom: 0.07in; }
+  .strip p { font-size: 0.245in; line-height: 1.34; color: #C6D2E8; }
+  .strip p b { color: #F7F1E1; }
+
+  .footer { margin-top: 0.18in; flex: none; display: flex; justify-content: space-between; align-items: center; font-size: 0.27in; color: #7E93BC; }
+  .footer b { color: #F7F1E1; }
+</style>
+</head>
+<body>
+  <div class="edge top"></div>
+  <div class="edge bottom"></div>
+  <div class="content">
+    <div class="eyebrow"><span>Maker Faire Demo</span><span class="rule"></span><span>A Glass-Box Robot</span></div>
+
+    <h1>Under the <span class="accent">Hood</span></h1>
+
+    <p class="tagline"><b>No black boxes.</b> Every formula, constant and score on this page is
+    real code driving the robot right now — most of it in one readable Python file: <b>tb4_claude_nav.py</b>.</p>
+
+    <div class="grid">
+
+      <div class="panel">
+        <h3><span class="num">1</span><span class="t">The cost map</span></h3>
+        <p class="sub">where it's safe to drive — with no prebuilt map</p>
+        <p>Each lidar sweep fills a <b>120×120 grid</b> (5 cm/cell = 6×6 m, robot at
+        centre); an OpenCV <b>L2 distance transform</b> gives each cell its clearance
+        <b>d</b>, then:</p>
+<pre>          ⎧ ∞                  d ≤ 0.18 m
+cost(d) = ⎨ 1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &lt; 0.30
+          ⎩ 0                  d ≥ 0.30 m</pre>
+        <p>A soft <b>"don't hug walls"</b> band (≈ Nav2's cost_scaling_factor):
+        equal-length routes aren't tied — more clearance wins.</p>
+        <div class="src">build_grid() — cv2.distanceTransform(free, DIST_L2)</div>
+      </div>
+
+      <div class="panel">
+        <h3><span class="num">2</span><span class="t">Frames &amp; rotation matrices</span></h3>
+        <p class="sub">why the map isn't sideways</p>
+        <p>The lidar is mounted <b>+90° from the robot frame</b>, so every beam (r, θ)
+        is rotated into base_link with a 2-D rotation matrix:</p>
+<pre>⎡x_b⎤   ⎡cos φ  −sin φ⎤⎡x_l⎤      φ = +π/2
+⎣y_b⎦ = ⎣sin φ   cos φ⎦⎣y_l⎦
+beam (r,θ):   x = −r·sin θ,   y = r·cos θ</pre>
+        <p>Heading comes from the odometry <b>quaternion</b>:
+        ψ = atan2(2(wz+xy), 1−2(y²+z²)). The code's own comment: <b>"without this
+        the whole grid is 90° off reality."</b></p>
+        <div class="src">build_grid(), _quat_to_yaw() — TF = +1.571 rad</div>
+      </div>
+
+      <div class="panel">
+        <h3><span class="num">3</span><span class="t">A* search</span></h3>
+        <p class="sub">the classic pathfinder, ~35 lines, on a live map</p>
+<pre>heap = [(h(start), 0, start)]  <span class="cm"># f = g + h</span>
+<span class="kw">while</span> heap:
+    g, (r,c) = <span class="fn">heappop</span>(heap)
+    <span class="kw">for</span> (dr,dc,step) <span class="kw">in</span> MOVES:  <span class="cm"># 1 or √2</span>
+        g2 = g + step + <span class="hl">cost[cell]</span>
+        <span class="kw">if</span> g2 &lt; best[cell]: <span class="fn">heappush</span>(…)</pre>
+        <p><b>8-connected</b>, h = Euclidean; the soft penalty rides in <b>g</b>, so paths
+        prefer open space. <b>Line-of-sight</b> smoothing trims corners — capped so
+        shortcuts can't cut the wall-hug band.</p>
+        <div class="src">astar() — 3 Hz replan, pure pursuit on 0.5 m lookahead</div>
+      </div>
+
+      <div class="panel">
+        <h3><span class="num">4</span><span class="t">Natural language → program</span></h3>
+        <p class="sub">any command → ranked pick from the behavior library</p>
+        <p>"<b>push the red ball to the wall</b>" <b>ranks</b> the .toy program library in two stages:</p>
+<pre><span class="cm"># 1. verbatim trigger (longest wins) → 1.0</span>
+<span class="str">"push the ball"</span> ∈ text → push_ball_to_wall
+<span class="cm"># 2. else token overlap, query Q vs corpus W</span>
+score = |Q ∩ W| / √(|Q| + 1)</pre>
+        <p>Stage 1 keeps a big word pool from shadowing an exact trigger. Deliberately
+        <b>dependency-free</b> — the code marks the seam: <b>"swap in an embedding
+        model here."</b></p>
+        <div class="src">match_program() — colour words ("red") filter detections</div>
+      </div>
+
+      <div class="panel">
+        <h3><span class="num">5</span><span class="t">Evaluating the detector</span></h3>
+        <p class="sub">is the new model actually better? measure, don't guess</p>
+        <div class="legend">
+          <span class="key"><span class="sw" style="background:#1E96AA"></span>yolov8s (candidate)</span>
+          <span class="key"><span class="sw" style="background:#C08414"></span>yolov5mu (deployed)</span>
+        </div>
+        <svg class="chart" viewBox="0 0 640 250" preserveAspectRatio="xMidYMid meet">
+          <g stroke="#34497B" stroke-width="1.5">
+            <line x1="150" y1="8" x2="150" y2="224"/>
+            <line x1="262" y1="8" x2="262" y2="224" opacity="0.5"/>
+            <line x1="375" y1="8" x2="375" y2="224" opacity="0.5"/>
+            <line x1="487" y1="8" x2="487" y2="224" opacity="0.5"/>
+            <line x1="600" y1="8" x2="600" y2="224" opacity="0.5"/>
+          </g>
+          <g font-family="DejaVu Sans Mono" font-size="20" fill="#7E93BC">
+            <text x="150" y="246" text-anchor="middle">0</text>
+            <text x="375" y="246" text-anchor="middle">0.5</text>
+            <text x="600" y="246" text-anchor="middle">1.0</text>
+          </g>
+          <g font-family="Liberation Sans" font-size="24" fill="#C6D2E8">
+            <text x="135" y="60" text-anchor="end">ball</text>
+            <text x="135" y="172" text-anchor="end">person</text>
+          </g>
+          <rect x="150" y="24" width="374" height="34" rx="4" fill="#1E96AA"/>
+          <rect x="150" y="64" width="270" height="34" rx="4" fill="#C08414"/>
+          <rect x="150" y="136" width="360" height="34" rx="4" fill="#1E96AA"/>
+          <rect x="150" y="176" width="356" height="34" rx="4" fill="#C08414"/>
+          <g font-family="DejaVu Sans Mono" font-size="22" font-weight="bold" fill="#F7F1E1">
+            <text x="532" y="48">0.83</text>
+            <text x="428" y="88">0.60</text>
+            <text x="518" y="160">0.80</text>
+            <text x="514" y="200">0.79</text>
+          </g>
+        </svg>
+        <p class="charttitle">Offline AP per class — the ball gap is why the swap is staged.</p>
+        <p style="margin-top:0.09in"><b>Deploy:</b> 416 input, conf 0.3, IoU 0.5, 6-SHAVE RVC2 blob, ~6 Hz on the camera
+        VPU. <b>Lesson:</b> a mis-compiled decode head once scored a bogus ~15% —
+        <b>eval the deployed artifact</b>, not just the .pt.</p>
+        <div class="src">models/YOLOV8S_SWAP.md · training/ · objdet18/</div>
+      </div>
+
+      <div class="panel">
+        <h3><span class="num">6</span><span class="t">The hacks that make it work</span></h3>
+        <p class="sub">sensor fusion &amp; the duct tape that survives a demo</p>
+        <div class="hack"><b>Depth that ignores the background</b> — distance = the
+        <b>25th percentile</b> of stereo depth in the box: the spatial NN kept reporting
+        the wall behind the ball.</div>
+        <div class="hack"><b>Two sensors, one answer</b> — pixel → bearing, then distance =
+        <b>min(stereo, lidar at that bearing)</b>: camera says <b>what</b>, the nearer
+        sensor says <b>where</b>.</div>
+        <div class="hack"><b>Detections become obstacles</b> — each seen object stamps a
+        <b>no-go disk</b> into the cost map — except the push target, whose cost is
+        <b>cleared</b> so A* may hit it.</div>
+        <div class="hack"><b>Stalling is the success signal</b> — a push is done when odometry
+        stops moving: the stuck detector doubles as <b>"ball pinned"</b>.</div>
+        <div class="hack"><b>The alarm that's ignored</b> — bump / cliff / wheel-drop e-stop
+        instantly; <b>backup_limit</b> cries wolf, so it's deliberately dropped.</div>
+        <div class="hack"><b>Sensors that heal themselves</b> — docking stops the lidar motor,
+        USB2 stalls the camera; stale timestamps trigger <b>auto-restarts</b>.</div>
+      </div>
+
+    </div>
+
+    <div class="strip">
+      <svg class="rpgmap" viewBox="0 0 330 240" preserveAspectRatio="xMidYMid meet">
+        <rect x="0" y="0" width="330" height="240" fill="#2E7D4F"/>
+        <g fill="#1F5A38">
+          <rect x="60" y="0" width="30" height="30"/><rect x="90" y="0" width="30" height="30"/><rect x="90" y="30" width="30" height="30"/>
+          <rect x="180" y="180" width="30" height="30"/><rect x="210" y="180" width="30" height="30"/><rect x="210" y="210" width="30" height="30"/>
+          <rect x="270" y="60" width="30" height="30"/>
+        </g>
+        <g fill="#1E5F8A">
+          <rect x="120" y="60" width="30" height="30"/><rect x="150" y="60" width="30" height="30"/><rect x="180" y="60" width="30" height="30"/>
+          <rect x="120" y="90" width="30" height="30"/><rect x="150" y="90" width="30" height="30"/><rect x="180" y="90" width="30" height="30"/>
+          <rect x="150" y="120" width="30" height="30"/>
+        </g>
+        <g fill="#4A5878">
+          <rect x="30" y="150" width="30" height="30"/><rect x="60" y="150" width="30" height="30"/><rect x="60" y="180" width="30" height="30"/>
+        </g>
+        <g stroke="#14213D" stroke-width="1" opacity="0.35">
+          <path d="M30 0 V240 M60 0 V240 M90 0 V240 M120 0 V240 M150 0 V240 M180 0 V240 M210 0 V240 M240 0 V240 M270 0 V240 M300 0 V240
+                   M0 30 H330 M0 60 H330 M0 90 H330 M0 120 H330 M0 150 H330 M0 180 H330 M0 210 H330"/>
+        </g>
+        <path d="M45 195 L45 105 L75 75 L105 45 L165 45 L225 45 L255 75 L255 135 L285 165 L285 195"
+              fill="none" stroke="#FFB627" stroke-width="6" stroke-dasharray="14 10" stroke-linecap="round"/>
+        <g transform="translate(45 195)">
+          <circle cx="0" cy="-8" r="9" fill="#F7F1E1"/>
+          <rect x="-8" y="0" width="16" height="16" rx="5" fill="#E23A2E"/>
+        </g>
+        <g transform="translate(285 195)">
+          <rect x="-12" y="-8" width="24" height="18" rx="4" fill="#C08414" stroke="#3A2800" stroke-width="3"/>
+          <line x1="-12" y1="0" x2="12" y2="0" stroke="#3A2800" stroke-width="3"/>
+        </g>
+      </svg>
+      <div>
+        <h3>Same A*, different worlds — the takeaway you can use tomorrow</h3>
+        <p>Panel 3's A* also routes <b>RPG characters</b> — tiles are cells, terrain is cost: grass
+        <b>1</b>, forest <b>2</b>, water <b>∞</b> — the same loop behind <b>GPS routing</b> and
+        <b>warehouse robots</b>. <span style="color:#7E93BC">astar() never knows whether the world is real.</span></p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span><b>github.com/scan33scan33/turtlebot4-glassbox</b> — ROS 2 Jazzy · Python · open source</span>
+      <span>Poster 2 of 2 · Under the Hood</span>
+    </div>
+  </div>
+</body>
+</html>

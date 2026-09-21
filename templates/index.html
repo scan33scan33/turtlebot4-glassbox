@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TB4 Navigator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Monaco", "Courier", monospace; background: #0a0a0a; color: #ccc; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; max-width: 1200px; margin: 0 auto; }
+        .panel { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 15px; }
+        .cam-panel { grid-column: 1; display: flex; flex-direction: column; }
+        .lidar-panel { grid-column: 2; grid-row: 1 / 3; }
+        .control-panel { grid-column: 1; }
+        .det-panel { grid-column: 1; }
+        img { max-width: 100%; height: auto; border-radius: 4px; }
+        .stat-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #222; }
+        .stat-row span:first-child { color: #888; }
+        .stat-row span:last-child { font-weight: bold; color: #4a9; }
+        .battery { padding: 10px; background: #1a2a1a; border-left: 4px solid #4a9; margin: 10px 0; border-radius: 3px; }
+        .battery.low { background: #2a1a1a; border-left-color: #a44; }
+        input[type=text], input[type=number] { padding: 8px; background: #222; border: 1px solid #333; color: #ccc; border-radius: 3px; width: 100%; margin: 10px 0; }
+        button { padding: 8px 12px; background: #4a9; color: #000; border: none; border-radius: 3px; cursor: pointer; font-weight: bold; margin: 5px 5px 5px 0; }
+        button:hover { background: #5b8; }
+        .btn-stop { background: #a44; } .btn-stop:hover { background: #b55; }
+        .btn-undock { background: #d90; } .btn-undock:hover { background: #ea1; }
+        .btn-dock { background: #6e40c9; color: #fff; } .btn-dock:hover { background: #7e50d9; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .sep { border: none; border-top: 1px solid #333; margin: 10px 0; }
+        .lbl { display: block; margin-top: 10px; color: #888; font-size: 0.9em; }
+        #det_list { padding: 10px; background: #0a0a0a; border: 1px solid #222; max-height: 200px; overflow-y: auto; border-radius: 3px; }
+        .det-item { padding: 6px; margin: 3px 0; background: #1a1a1a; border-left: 3px solid #4a9; }
+        .det-item span { color: #4a9; font-weight: bold; }
+        .status-bar { padding: 10px; background: #1a1a1a; border-top: 1px solid #333; text-align: center; color: #888; }
+        .idle { color: #888; } .navigating { color: #4a9; } .finding { color: #db8; } .arrived { color: #4a9; }
+        #lidar-overlay { position: absolute; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="cam-panel panel">
+    <div>Camera + YOLO — click an object to drive to it</div>
+    <img id="cam" src="/camera.jpg" alt="camera" onclick="camClick(event)" style="cursor: crosshair;">
+  </div>
+
+  <div class="lidar-panel panel">
+    <div>Lidar BEV (click to navigate)</div>
+    <div style="position: relative; display: inline-block; width: 100%;">
+      <img id="lidar" src="/lidar.png" alt="lidar" style="width: 100%; display: block;">
+      <canvas id="lidar-overlay" style="position: absolute; top: 0; left: 0; width: 100%; display: block; pointer-events: none;"></canvas>
+    </div>
+    <div class="stat-row"><span>Robot</span><span id="ry">0.000</span></div>
+    <div class="stat-row"><span>Goal</span><span id="goal_disp">—</span></div>
+    <div class="stat-row"><span>Ball goal</span><span id="ballgoal_disp" style="color:#fc3;">—</span></div>
+  </div>
+
+  <div class="control-panel panel">
+    <div class="stat-row"><span>Pos X</span><span id="rx">0.000</span></div>
+    <div class="stat-row"><span>Pos Y</span><span id="ry">0.000</span></div>
+    <div class="stat-row"><span>Yaw</span><span id="ryaw">0.0°</span></div>
+    <div class="battery" id="battery"><strong>Battery:</strong> <span id="batt_pct">—</span>% | <span id="batt_volt">—</span>V</div>
+    <div class="stat-row"><span>Dock</span><span id="dock_disp">—</span></div>
+    <div class="stat-row"><span>Health</span><span id="health_disp" style="font-weight:bold;"><span id="h_cam">●</span> cam <span id="h_lidar">●</span> lidar <span id="h_base">●</span> base</span></div>
+    <button class="btn btn-undock" id="undock_btn" onclick="undock()">Undock</button>
+    <button class="btn btn-dock" id="dock_btn" onclick="dock()">Dock</button>
+    <hr class="sep">
+    <div class="lbl">Navigate — click a detected object (camera) or a point on the Lidar BEV</div>
+    <button class="btn btn-stop" onclick="stopNav()">Stop</button>
+    <label class="lbl" style="display:block; margin:6px 0;">
+      <input type="checkbox" id="push_mode"> Push mode (drive into / through the target)
+    </label>
+    <label class="lbl" style="display:block; margin:4px 0;">
+      <input type="checkbox" id="ball_goal_mode"> 🎯 Ball goal — click the BEV to mark where the <b>ball</b> goes
+    </label>
+    <div style="font-size:11px; color:#777; margin:-2px 0 6px;">
+      With that ticked, a BEV click marks the target for the ball instead of driving there.
+      Then run task: <i>“push the ball to the goal”</i>.
+    </div>
+    <button class="btn" onclick="clearBallGoal()" style="background:#555; color:#ddd;">Clear ball goal</button>
+    <label class="lbl" style="display:block; margin:4px 0;">
+      <input type="checkbox" id="lidar_dist" onchange="toggleLidarDist()"> Smart distance (depth p25 over the box)
+    </label>
+    <hr class="sep">
+    <div class="lbl">Task (ToyScript) — say what you want</div>
+    <input type="text" id="task_input" placeholder="clean up the toys, find the bottle, go home…"
+           onkeydown="if(event.key==='Enter') runTask()">
+    <button class="btn" onclick="runTask()">▶ Run task</button>
+    <button class="btn" onclick="stopTask()" style="background:#a44;">■ Stop task</button>
+    <div id="run_status" style="margin-top:6px; font-family:monospace; font-size:11px; color:#9c9; white-space:pre-wrap;"></div>
+    <div id="reasoning" style="margin-top:10px; display:none; background:#0f1710; border:1px solid #2a3a2a; border-radius:5px; padding:10px 12px;">
+      <div style="color:#8d8; font-size:10px; letter-spacing:1.5px; font-weight:bold;">REASONING</div>
+      <div id="rz_cmd" style="font-family:monospace; font-size:14px; color:#dfe8ff; margin-top:5px;"></div>
+      <div id="rz_intent" style="font-size:11px; color:#9c9; margin:5px 0 9px;"></div>
+      <div id="rz_plan" style="font-size:12.5px; line-height:1.85; font-family:monospace;"></div>
+    </div>
+    <div class="lbl" style="margin-top:8px;">Commands (last 5)</div>
+    <div id="cmd_history" style="font-family:monospace; font-size:11px; line-height:1.6;"></div>
+    <hr class="sep">
+    <div class="lbl">Dataset recording</div>
+    <button class="btn" id="rec_btn" onclick="toggleRecord()">● Start Recording</button>
+    <span id="rec_status" style="margin-left:8px; color:#888;"></span>
+    <hr class="sep">
+    <div class="lbl" id="match_info"></div>
+  </div>
+
+  <div class="det-panel panel">
+    <div>Detections</div>
+    <div id="det_list">none</div>
+  </div>
+</div>
+
+<div id="hazard_banner" style="display:none; padding:10px; background:#a00; color:#fff; text-align:center; font-weight:bold;"></div>
+<div class="status-bar">
+  Status: <span id="status" class="idle">idle</span>
+</div>
+
+<script>
+let lastState = {odom_x:0, odom_y:0, odom_yaw:0};
+const IMG_REFRESH_MS = 500;
+
+function update() {
+  // Refresh the live images FIRST, independent of the /state panel — a render
+  // error (or a slow/failed /state) must never be able to freeze the feed.
+  document.getElementById('cam').src = '/camera.jpg?t=' + Date.now();
+  document.getElementById('lidar').src = '/lidar.png?t=' + Date.now();
+  fetch('/state?t=' + Date.now(), {cache:'no-store'}).then(r=>r.json()).then(s=>{
+    lastState = s;
+    document.getElementById('rx').textContent = s.odom_x.toFixed(3);
+    document.getElementById('ry').textContent = s.odom_y.toFixed(3);
+    document.getElementById('ryaw').textContent = s.odom_yaw.toFixed(1);
+    document.getElementById('goal_disp').textContent = s.goal_odom ? `(${s.goal_odom[0].toFixed(2)}, ${s.goal_odom[1].toFixed(2)})` : '—';
+    document.getElementById('ballgoal_disp').textContent = s.ball_goal ? `(${s.ball_goal[0].toFixed(2)}, ${s.ball_goal[1].toFixed(2)})` : '—';
+    const batt_pct = s.battery_percentage ? (s.battery_percentage * 100).toFixed(0) : '—';
+    const batt_volt = s.battery_voltage ? s.battery_voltage.toFixed(2) : '—';
+    document.getElementById('batt_pct').textContent = batt_pct;
+    document.getElementById('batt_volt').textContent = batt_volt;
+    document.getElementById('match_info').textContent = s.match_info || '';
+    const dd = document.getElementById('dock_disp');
+    dd.textContent = s.dock_busy ? 'working…' : (s.docked === null ? '—' : (s.docked ? 'docked' : 'undocked'));
+    dd.style.color = s.docked ? '#4a9' : (s.docked === false ? '#db8' : '#888');
+    // Disable the irrelevant button: can't dock while docked, can't undock while undocked.
+    document.getElementById('dock_btn').disabled   = s.dock_busy || s.docked === true;
+    document.getElementById('undock_btn').disabled = s.dock_busy || s.docked === false;
+    const hdot = (id, ok) => { const e = document.getElementById(id); if (e) e.style.color = ok ? '#4a9' : '#a44'; };
+    hdot('h_cam', s.cam_ok); hdot('h_lidar', s.lidar_ok); hdot('h_base', s.base_ok);
+    const el = document.getElementById('status');
+    el.textContent = s.status; 
+    el.className = s.status.split(' ')[0];
+    const dl = document.getElementById('det_list');
+    if (s.detections && s.detections.length) {
+      dl.innerHTML = s.detections.map(d => `<div class="det-item"><span>${d.label}</span> ${(d.conf*100).toFixed(0)}% | ${d.dist.toFixed(2)}m</div>`).join('');
+    } else {
+      dl.textContent = 'none';
+    }
+    const rb = document.getElementById('rec_btn');
+    const rs = document.getElementById('rec_status');
+    if (s.recording) {
+      rb.textContent = '■ Stop Recording';
+      rb.style.background = '#a44';
+      rs.textContent = `● REC ${s.record_drive || ''} (${s.record_steps||0})`;
+      rs.style.color = '#e55';
+    } else {
+      rb.textContent = '● Start Recording';
+      rb.style.background = '#4a9';
+      rs.textContent = '';
+    }
+    const ldc = document.getElementById('lidar_dist');
+    if (ldc && document.activeElement !== ldc) ldc.checked = !!s.use_lidar_dist;
+    const hb = document.getElementById('hazard_banner');
+    if (s.hazards && s.hazards.length) {
+      hb.textContent = '⚠ ' + s.hazards.map(h => h.where ? `${h.type} (${h.where})` : h.type).join(', ').toUpperCase();
+      hb.style.display = 'block';
+    } else {
+      hb.style.display = 'none';
+    }
+    const rstat = document.getElementById('run_status');
+    if (rstat) {
+      if (s.run_active || (s.run_log && s.run_log.length)) {
+        const head = (s.run_active ? '▶ ' : '✓ ') + (s.run_program||'') + (s.run_error ? '  ERROR: '+s.run_error : '');
+        rstat.textContent = head + '\\n' + (s.run_log||[]).slice(-8).join('\\n');
+      } else { rstat.textContent = ''; }
+    }
+    // Reasoning: plain-language command -> matched skill -> plan, live step lit up
+    var rz = document.getElementById('reasoning');
+    if (rz) {
+      if (s.plan && s.plan.length && (s.last_command || s.run_program)) {
+        rz.style.display = 'block';
+        document.getElementById('rz_cmd').textContent = '“' + (s.last_command||'') + '”';
+        document.getElementById('rz_intent').textContent =
+            '↳ understood as skill: ' + (s.run_program||'') +
+            (s.match_score ? '  ·  match ' + s.match_score.toFixed(2) : '') +
+            (s.target_color ? '  ·  target colour: ' + s.target_color : '');
+        var leadVerb = function(c){ var m = (c.cmd||'').match(/[A-Z_]+/); return m ? m[0] : ''; };
+        var runList = (s.cmd_history||[]).filter(function(c){return c.running;});
+        var runVerb = runList.length ? leadVerb(runList[runList.length-1]) : '';
+        var doneVerbs = {};
+        (s.cmd_history||[]).forEach(function(c){ if(!c.running){ var v=leadVerb(c); if(v) doneVerbs[v]=1; } });
+        var verbs = s.plan.map(function(p){return p.verb;});
+        var curIdx = verbs.indexOf(runVerb);
+        if (curIdx < 0) { for (var i=0;i<verbs.length;i++){ if(doneVerbs[verbs[i]]) curIdx=i; } }
+        document.getElementById('rz_plan').innerHTML = s.plan.map(function(p, i){
+          var mark, col;
+          if (s.run_active && i === curIdx)            { mark='▶'; col='#ee5'; }
+          else if (curIdx >= 0 && i < curIdx)          { mark='✓'; col='#6d6'; }
+          else if (!s.run_active && doneVerbs[p.verb]) { mark='✓'; col='#6d6'; }
+          else                                         { mark='○'; col='#667'; }
+          return '<div style="color:'+col+'">'+mark+' '+(i+1)+'. '+p.phrase+'</div>';
+        }).join('');
+      } else { rz.style.display = 'none'; }
+    }
+    var ch = document.getElementById('cmd_history');
+    if (ch) {
+      ch.innerHTML = (s.cmd_history||[]).map(function(c){
+        var icon = c.running ? '<span style="color:#dd6">▶</span>' : '<span style="color:#6c6">✓</span>';
+        var res  = c.running ? '<span style="color:#dd6">…running</span>' : '<span style="color:#9c9">'+(c.result||'')+'</span>';
+        return '<div>'+icon+' '+c.cmd+' <span style="color:#888">&rarr;</span> '+res+'</div>';
+      }).join('');
+    }
+  }).catch(()=>{});
+}
+setInterval(update, IMG_REFRESH_MS);
+
+function toggleRecord() {
+  const on = !(lastState && lastState.recording);
+  fetch('/record', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({on})});
+}
+function toggleLidarDist() {
+  const on = document.getElementById('lidar_dist').checked;
+  fetch('/lidar_dist', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({on})});
+}
+
+const _LV = 400, _LS = _LV / (120 * 0.05);
+function lidarClick(e) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (_LV / rect.width);
+  const py = (e.clientY - rect.top) * (_LV / rect.height);
+  const xLoc = (_LV/2 - py) / _LS;            // forward (+x)
+  const yLoc = (_LV/2 - px) / _LS;            // left (+y): screen-left = +y, matches the BEV
+  const yaw = lastState.odom_yaw * Math.PI / 180;
+  const gx = lastState.odom_x + xLoc * Math.cos(yaw) - yLoc * Math.sin(yaw);
+  const gy = lastState.odom_y + xLoc * Math.sin(yaw) + yLoc * Math.cos(yaw);
+  if (_ballGoalMode()) {          // marking where the BALL should end up
+    fetch('/set_ball_goal', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({x: gx, y: gy})});
+    return;
+  }
+  fetch('/goto_xy', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({x: gx, y: gy, mode: _mode()})});
+}
+function clearBallGoal() {
+  fetch('/set_ball_goal', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({clear: true})});
+}
+
+document.getElementById('lidar').addEventListener('click', lidarClick);
+function camClick(e) {
+  // click a detected object in the camera to drive to it (no typing)
+  const rect = e.currentTarget.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) * (416 / rect.width);   // -> 416 preview coords
+  const cy = (e.clientY - rect.top) * (416 / rect.height);
+  const dets = (lastState && lastState.detections) || [];
+  let hit = null, best = 1e9;
+  for (const d of dets) {
+    if (d.x_px == null) continue;
+    const dx = Math.abs(cx - d.x_px), dy = Math.abs(cy - d.y_px);
+    if (dx <= d.w_px/2 + 8 && dy <= d.h_px/2 + 8) {
+      const sc = dx*dx + dy*dy;
+      if (sc < best) { best = sc; hit = d; }
+    }
+  }
+  if (!hit) return;
+  const yaw = lastState.odom_yaw * Math.PI / 180;
+  const gx = lastState.odom_x + hit.x_loc*Math.cos(yaw) - hit.y_loc*Math.sin(yaw);
+  const gy = lastState.odom_y + hit.x_loc*Math.sin(yaw) + hit.y_loc*Math.cos(yaw);
+  fetch('/goto_xy', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({x: gx, y: gy, mode: _mode()})});
+}
+function stopNav() { fetch('/stop', {method:'POST'}); }
+function dock()   { fetch('/dock',   {method:'POST'}); }
+function undock() { fetch('/undock', {method:'POST'}); }
+function runTask() {
+  const text = document.getElementById('task_input').value.trim();
+  if (!text) return;
+  fetch('/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})})
+    .then(r => r.json()).then(j => {
+      if (!j.ok) alert('No matching program. Available: ' + (j.available||[]).join(', '));
+    });
+}
+function stopTask() { fetch('/run_stop', {method:'POST'}); }
+function _mode() { return document.getElementById('push_mode').checked ? 'push' : 'move'; }
+function _ballGoalMode() { const e = document.getElementById('ball_goal_mode'); return !!(e && e.checked); }
+</script>
+</body>
+</html>

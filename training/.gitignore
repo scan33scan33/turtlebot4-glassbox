@@ -1,0 +1,7 @@
+# training artifacts — don't bloat the repo
+frames/
+dataset/
+runs/
+*.pt
+*.onnx
+*.blob

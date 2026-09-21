@@ -1,0 +1,12 @@
+# name: follow_dog
+# description: follow the closest dog at a safe distance
+# triggers: follow the dog, follow dog, chase the dog, follow the puppy, come with dog, track the dog
+# plan: follow the closest dog@FOLLOW
+#
+# Like follow_human but targeting a dog: trails the closest dog at a safe
+# standoff, AVOIDING obstacles (move mode, NOT push) — never drives into it, and
+# turns to re-find it if it leaves the camera's view. Runs until you press Stop.
+
+PRINT "Looking for a dog to follow — press Stop to end."
+SET r = FOLLOW("dog", 1.0)
+PRINT "Stopped following the dog."

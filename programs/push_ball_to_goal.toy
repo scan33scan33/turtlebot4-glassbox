@@ -1,0 +1,21 @@
+# name: push_ball_to_goal
+# description: push the ball to the goal point you marked
+# triggers: push the ball to the goal, push the ball there, push the ball to the mark, push ball to goal, ball to the goal, push it to the goal, push the ball to the spot, push the ball to that point
+# plan: locate the ball (scan)@SCAN_FOR | line up behind the ball & push it to your goal@PUSH_TO_GOAL
+#
+# The goal is the point a HUMAN marked: tick the Ball-goal box in the web UI and
+# click the BEV (or POST /set_ball_goal). Each round the robot finds the ball,
+# marks it, drives to the point BEHIND it on the goal-ball line, squares up, and
+# shoves - then re-measures and repeats. A crooked shove is therefore corrected
+# by the next round instead of compounding, which is what makes it converge on
+# the goal. Hard-code a goal in odom metres with PUSH_TO_GOAL(x, y) instead.
+
+SET ball = SCAN_FOR("ball", 360)
+IF ball != NONE THEN
+    PRINT "Found the ball - pushing it to the goal you marked."
+    SET r = PUSH_TO_GOAL()
+    PRINT "Result:"
+    PRINT r
+ELSE
+    PRINT "No ball found in the room."
+END

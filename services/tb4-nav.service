@@ -1,0 +1,16 @@
+[Unit]
+Description=TB4 Claude Nav control server (web UI on :5000) + startup chime
+After=turtlebot4.service tb4-oakd.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Environment=HOME=/home/ubuntu
+WorkingDirectory=/home/ubuntu/Workspace/turtlebot4-glassbox
+ExecStart=/bin/bash /home/ubuntu/Workspace/turtlebot4-glassbox/run_nav.sh
+Restart=on-failure
+RestartSec=8
+
+[Install]
+WantedBy=multi-user.target

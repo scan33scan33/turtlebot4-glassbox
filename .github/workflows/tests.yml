@@ -1,0 +1,64 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # The suite drives a simulated base in real time (~3 min); give it headroom.
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      # No ROS 2 here on purpose: the tests stub the ROS message packages and
+      # import the navigator for real, so they run on a stock runner.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile every Python file
+        run: |
+          python -m compileall -q \
+            tb4_claude_nav.py toyscript.py dataset_tools.py goal_cycle.py \
+            goal_run.py oakd_rgbd.launch.py tests training objdet18
+
+      - name: Check shell scripts parse
+        run: |
+          for f in chime.sh run_nav.sh run_oakd.sh \
+                   scripts/download_models.sh \
+                   services/install.sh services/tb4-oakd-run.sh \
+                   objdet18/run_all.sh objdet18/run_coco_only.sh; do
+            bash -n "$f" && echo "ok  $f"
+          done
+
+      - name: Parse every .toy program
+        run: |
+          python - <<'PY'
+          import glob, sys, toyscript
+          bad = 0
+          for p in sorted(glob.glob('programs/*.toy')):
+              try:
+                  with open(p) as fh:
+                      toyscript.Parser(toyscript.tokenize(fh.read())).parse()
+                  print(f'ok    {p}')
+              except Exception as e:
+                  print(f'FAIL  {p}: {e}'); bad = 1
+          sys.exit(bad)
+          PY
+
+      - name: Run the closed-loop push tests
+        run: python tests/test_push_to_goal.py
+
+      - name: DSL smoke run against MockRobot
+        run: python toyscript.py programs/push_ball_to_goal.toy

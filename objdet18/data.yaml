@@ -1,0 +1,24 @@
+# Merged COCO + Objects365 dataset, remapped to 18 classes (see taxonomy.py).
+path: ./dataset
+train: images/train
+val: images/val
+names:
+  0: chair
+  1: book
+  2: bottle
+  3: dining table
+  4: bowl
+  5: handbag
+  6: backpack
+  7: potted plant
+  8: couch
+  9: cell phone
+  10: suitcase
+  11: vase
+  12: sports ball
+  13: tv
+  14: dog
+  15: teddy bear
+  16: refrigerator
+  17: bed
+  18: person

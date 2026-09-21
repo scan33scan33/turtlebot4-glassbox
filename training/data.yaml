@@ -1,0 +1,10 @@
+# Few-class dataset for the OAK-D nano detector.
+# Edit `names` to your target classes; keep the ids contiguous from 0.
+# (Colour is handled separately at runtime by _detect_color — do NOT make
+#  "green ball", "pink ball" etc. separate classes here; keep just "ball".)
+path: ./dataset
+train: images/train
+val: images/val
+names:
+  0: ball
+  1: person

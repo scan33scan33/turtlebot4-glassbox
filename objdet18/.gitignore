@@ -1,0 +1,6 @@
+dataset/
+runs/
+_o365_tmp/
+*.pt
+*.onnx
+*.blob
