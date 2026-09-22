@@ -61,6 +61,11 @@ python3 -m http.server 8000 --directory docs/slides
 `F` fullscreen. Click the right third of the slide to advance, left third to
 go back. Swipe works on a phone/tablet. Deep-link with `#12`.
 
+**Auto-advance / kiosk mode:** append `?refresh=20s` to advance every 20
+seconds, for example `maker-faire.html?refresh=20s#1`. Bare seconds such as
+`?refresh=20` also work. It loops from the last slide to the first, resets the
+timer after manual navigation, and pauses while the tab is hidden.
+
 Print-to-PDF (one slide per page) works from Chromium’s print dialog —
 “Background graphics” on, margins none, landscape or portrait both fine
 (slides are fluid).

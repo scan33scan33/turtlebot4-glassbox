@@ -248,6 +248,7 @@
   .chrome .dot.on { background: var(--amber); transform: scale(1.25); }
   .chrome .dot:hover { background: var(--ink); }
   .chrome .meta { margin-left: auto; display: flex; gap: 1.2rem; align-items: center; }
+  .chrome .auto { color: var(--amber); font-weight: 800; }
   .chrome kbd {
     display: inline-block; padding: 1px 6px; border-radius: 4px;
     border: 1px solid var(--navy3); background: var(--navy2);
@@ -1142,6 +1143,7 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
 <div class="chrome" id="chrome">
   <div class="dots" id="dots" aria-label="Slide navigation"></div>
   <div class="meta">
+    <span class="auto" id="autoplayStatus" hidden></span>
     <span id="counter">1 / 1</span>
     <span class="hint"><kbd>←</kbd> <kbd>→</kbd> <kbd>F</kbd> fullscreen</span>
   </div>
@@ -1152,7 +1154,17 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
   const slides = Array.from(document.querySelectorAll('.slide'));
   const dotsBox = document.getElementById('dots');
   const counter = document.getElementById('counter');
+  const autoplayStatus = document.getElementById('autoplayStatus');
+  const refreshMatch = (location.search || '').match(/[?&]refresh=([^&]+)/i);
+  const refreshMs = parseRefresh(refreshMatch ? refreshMatch[1] : '');
+  let refreshTimer = null;
   let i = 0;
+
+  if (refreshMs) {
+    const seconds = refreshMs / 1000;
+    autoplayStatus.hidden = false;
+    autoplayStatus.textContent = 'auto · ' + (Number.isInteger(seconds) ? seconds : seconds.toFixed(1)) + 's';
+  }
 
   // build dots
   slides.forEach((s, idx) => {
@@ -1170,6 +1182,20 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
     document.getElementById('astarReplay')
   );
 
+  function parseRefresh(raw) {
+    const match = /^(\d+(?:\.\d+)?)s?$/i.exec(String(raw).trim());
+    if (!match) return 0;
+    const ms = Number(match[1]) * 1000;
+    return ms >= 1000 && ms <= 86400000 ? ms : 0;
+  }
+
+  function scheduleAutoAdvance() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = null;
+    if (!refreshMs || document.hidden) return;
+    refreshTimer = setTimeout(() => go((i + 1) % slides.length), refreshMs);
+  }
+
   function go(n) {
     if (n < 0 || n >= slides.length) return;
     slides[i].classList.remove('on');
@@ -1182,6 +1208,7 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
     // keep active dot visible if many
     dots[i].scrollIntoView({ block: 'nearest', inline: 'nearest' });
     try { history.replaceState(null, '', '#' + (i + 1)); } catch (e) {}
+    scheduleAutoAdvance();
   }
 
   function next() { go(Math.min(slides.length - 1, i + 1)); }
@@ -1228,6 +1255,9 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
     if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
     tx = null;
   }, { passive: true });
+
+  // Do not burn through slides while the tab or display is hidden.
+  document.addEventListener('visibilitychange', scheduleAutoAdvance);
 
   /* A real A* search, rendered as a looping pixel-game example. */
   function createAStarDemo(canvas, replayButton) {
@@ -1490,7 +1520,12 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
   }
 
   // expose for console tinkering
-  window.Deck = { go, next, prev, get index() { return i; }, get count() { return slides.length; } };
+  window.Deck = {
+    go, next, prev,
+    get index() { return i; },
+    get count() { return slides.length; },
+    get refreshMs() { return refreshMs; }
+  };
 })();
 </script>
 </body>
