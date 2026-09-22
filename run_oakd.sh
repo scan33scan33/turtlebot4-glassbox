@@ -12,9 +12,12 @@ set +u; source /opt/ros/jazzy/setup.bash; set -u
 ROOT=${TB4_ROOT:-$HOME/Workspace/turtlebot4-glassbox}
 export FASTRTPS_DEFAULT_PROFILES_FILE="$ROOT/fastdds_no_shm.xml"
 # Preflight: the blobs are Release assets, not committed. Fail with a clear
-# pointer instead of letting depthai die on a missing file.
-if [ ! -f "$ROOT/models/yolov5mu_416_5shave.blob" ]; then
-    echo "error: models/yolov5mu_416_5shave.blob is missing." >&2
+# pointer instead of letting depthai die on a missing file. The name comes from
+# models/DEFAULT_MODEL — the same source oakd_rgbd.launch.py reads — so this
+# check can never pass for a blob the launch is not about to load.
+MODEL="${TB4_OAKD_MODEL:-$(cat "$ROOT/models/DEFAULT_MODEL")}"
+if [ ! -f "$ROOT/models/$MODEL.blob" ]; then
+    echo "error: models/$MODEL.blob is missing." >&2
     echo "       Fetch the model blobs first:  bash scripts/download_models.sh" >&2
     exit 1
 fi

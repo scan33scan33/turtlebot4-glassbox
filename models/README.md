@@ -1,7 +1,7 @@
 # models/ — OAK-D YOLO blobs + configs
 
-This directory holds the **deployed** OAK-D blobs (RVC2, 416 input) and their
-decode configs. The `.json` configs are committed; **the `.blob` files are
+This directory holds the **deployed** OAK-D blobs (RVC2, 416 input) and the
+decode config they share. The config is committed; **the `.blob` files are
 not** — they are published as **GitHub Release assets** and fetched on demand:
 
 ```bash
@@ -20,9 +20,25 @@ re-downloads them on demand.
 |---|---|---|---|
 | `yolov5mu_416_5shave.blob` | **deployed** YOLOv5mu (medium anchor-free), 5 shaves, FP16 | ~49 MB | Release asset |
 | `yolov8s_416_fixed_6shave.blob` | **staged** YOLOv8s (swap candidate, see `YOLOV8S_SWAP.md`), 6 shaves, FP16 | ~22 MB | Release asset |
-| `nn_yolov5mu.json` | decode config for the v5mu blob (COCO-80) | | committed |
-| `nn_yolov8s.json` | decode config for the v8s blob (labels byte-identical to v5mu) | | committed |
-| `nn_yolov8n.json` | template config for a **YOLOv8n** build (blob not yet exported — run `training/export_for_oak.py` to generate `yolov8n_416_6shave.blob` and update this JSON) | | committed |
+| `nn_base.json` | the shared decode config: COCO-80 label mappings + conf 0.3 / iou 0.5. The per-blob `model` block is injected at launch, so **one** config serves every detector | 1.7 KB | committed |
+| `DEFAULT_MODEL` | the blob name to launch when `TB4_OAKD_MODEL` is unset | 22 B | committed |
+
+### Adding a detector
+
+There is no per-model config to write. Drop the `.blob` in `models/` (or publish
+it as a Release asset and add its SHA-256 to `scripts/download_models.sh`), then
+point the launch at it:
+
+```bash
+TB4_OAKD_MODEL=yolov8n_416_6shave bash run_oakd.sh
+```
+
+Both blobs must use the same COCO-80 label set and spellings as `nn_base.json`
+(`sofa`, `tvmonitor`, `pottedplant`, `diningtable`, `motorbike`, `aeroplane`) —
+`tb4_claude_nav.py` maps `class_id` through its own `COCO_LABELS`, so a
+detector trained on different names needs that list updating too. A YOLOv8n
+build is the obvious next candidate: `training/export_for_oak.py` produces the
+blob.
 
 ### Fetching the blobs
 
@@ -37,8 +53,10 @@ If you forked or renamed the repo, point it at your own Release:
 TB4_MODELS_REPO=<owner>/<name> TB4_MODELS_TAG=models-v1 bash scripts/download_models.sh
 ```
 
-`run_oakd.sh` and `services/tb4-oakd-run.sh` check for the deployed blob at
-startup and tell you to run this script if it's missing.
+`run_oakd.sh` and `services/tb4-oakd-run.sh` read `models/DEFAULT_MODEL` (or
+`TB4_OAKD_MODEL`) and check that blob exists at startup, telling you to run this
+script if it's missing — the same resolution `oakd_rgbd.launch.py` does, so the
+preflight can't pass for a blob the launch isn't about to load.
 
 #### Publishing a new blob
 
@@ -51,12 +69,32 @@ sha256sum models/*.blob
 
 ### Paths
 
-The JSONs contain an absolute `model_name`
-(`/home/ubuntu/Workspace/turtlebot4-glassbox/models/*.blob`). That is the **stock
-TurtleBot 4 Pi path** (`ubuntu` is the default Pi user). On the Pi it works
-as-is. If you clone elsewhere, point `oakd_rgbd.launch.py` at your JSON (the
-launch honors `TB4_ROOT`, e.g. `TB4_ROOT=$HOME/Workspace/turtlebot4-glassbox`) and edit
-the JSON's `model_name` to match your checkout, or keep the Pi default.
+Nothing committed under `models/` contains an absolute path. At launch,
+`oakd_rgbd.launch.py` resolves `TB4_ROOT` (default `~/Workspace/turtlebot4-glassbox`,
+the stock TurtleBot 4 Pi location), reads `nn_base.json`, injects a `model` block
+pointing at wherever the blob actually is, and writes the result to
+`/tmp/tb4_nn_<model>.json`. It prints both paths so you can confirm at a glance
+which detector is live:
+
+```
+[oakd] nn config : /tmp/tb4_nn_yolov5mu_416_5shave.json
+[oakd] nn blob   : /home/ubuntu/Workspace/turtlebot4-glassbox/models/yolov5mu_416_5shave.blob
+```
+
+So a clone anywhere works with no edits:
+
+```bash
+TB4_ROOT=$HOME/projects/turtlebot4-glassbox bash run_oakd.sh
+```
+
+> This replaced three committed `nn_yolov*.json` files that were byte-identical
+> apart from `model.model_name` — i.e. the 80 COCO labels were stored three
+> times, and the one value that differed was hardcoded to
+> `/home/ubuntu/Workspace/turtlebot4-glassbox/...`. A clone at any other path
+> silently pointed depthai at a blob that did not exist. The COCO-80 list is now
+> in two places (`nn_base.json` and `COCO_LABELS` in the navigator) instead of
+> four; collapsing those two into one is tracked in
+> `docs/simplification-plan.md`.
 
 ### Regenerating a blob
 
