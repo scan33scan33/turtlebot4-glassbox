@@ -458,7 +458,7 @@
     </div>
     <div class="title-meta">
       <span><b>open source</b> · github.com/scan33scan33/turtlebot4-glassbox</span>
-      <span>ROS&nbsp;2 Jazzy · Python · no RL</span>
+      <span>ROS&nbsp;2 Jazzy · Python · runs on-robot</span>
     </div>
   </div>
 </section>
@@ -491,8 +491,9 @@
       </div>
     </div>
     <div class="callout" style="margin-top:.4rem;">
-      Formerly an RL experiment. <b>No reinforcement learning survives today.</b>
-      The clever parts are geometry, A*, and a 50-line task language.
+      Think <b>“an AI coding agent for the physical world”</b>: your prompt picks a program from a
+      library and it runs on the robot — except the programs are <b>hand-written</b> and the picker
+      is <b>50 readable lines</b>. Geometry, A*, and a tiny task language: nothing you can’t inspect.
     </div>
   </div>
 </section>
@@ -1006,7 +1007,51 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     13 · DEMO: PUSH BALL
+     13 · IS IT A VLA?
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide" data-title="Prompt → script">
+  <div class="eyebrow"><span>The mental model</span><span class="rule"></span><span>prompt in, script runs</span></div>
+  <h2>Like Claude Code, <span class="accent">not</span> like a VLA.</h2>
+  <div class="body">
+    <p class="tagline" style="max-width:none;">
+      The same interaction shape as an AI coding agent — you type a prompt and
+      <b>a script runs on the robot</b>. But <b>no neural net chooses or writes the actions.</b>
+    </p>
+    <div class="chips">
+      <span class="chip"><b>“push the ball to the wall”</b></span>
+      <span class="chip">→ match_program()</span>
+      <span class="chip">→ push_ball_to_wall.toy</span>
+      <span class="chip">→ SCAN_FOR · PUSH_AWAY · PUSH_THROUGH</span>
+    </div>
+    <div class="compare">
+      <div class="card">
+        <h3>A VLA model <span class="muted" style="font-weight:600;font-size:.8em;">(RT-2 · OpenVLA · π0)</span></h3>
+        <ul class="clean">
+          <li><b>One big neural net</b>: camera + language in, motor commands out</li>
+          <li>Learned end-to-end from massive robot data</li>
+          <li>Needs a GPU in the loop</li>
+          <li>Powerful — but a <b>black box</b>: you can’t read <em>why</em> it pushed</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>This robot</h3>
+        <ul class="clean">
+          <li>Your words → a <b>50-line rule-based matcher</b> picks a <b>hand-written script</b></li>
+          <li>The script sequences classical skills: YOLO labels, A*, contact geometry</li>
+          <li>Nothing learned end-to-end — the whole loop runs on a Pi</li>
+          <li>Every step <b>readable and unit-testable</b> — that’s the glass box</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">
+      Same UX as “the model writes a script from your prompt” — with a <b>rule book instead of a model</b>
+      and scripts a human wrote on purpose. A little flexibility traded for something you can fully explain.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     14 · DEMO: PUSH BALL
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="Push the ball">
   <div class="eyebrow"><span>Demo · crowd favorite</span><span class="rule"></span><span>geometry, not magic</span></div>
@@ -1068,7 +1113,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     14 · MORE DEMOS
+     15 · MORE DEMOS
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="More demos">
   <div class="eyebrow"><span>Demo menu</span><span class="rule"></span><span>try these at the booth</span></div>
@@ -1105,7 +1150,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     15 · HACKS
+     16 · HACKS
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Hacks">
   <div class="eyebrow"><span>Reality</span><span class="rule"></span><span>the duct tape that survives a demo</span></div>
@@ -1141,7 +1186,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     16 · WHAT YOU CAN STEAL
+     17 · WHAT YOU CAN STEAL
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="Takeaways">
   <div class="eyebrow"><span>Takeaways</span><span class="rule"></span><span>ideas you can use tomorrow</span></div>
@@ -1188,7 +1233,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     17 · OPEN SOURCE / END
+     18 · OPEN SOURCE / END
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Open source">
   <div class="eyebrow"><span>Open source</span><span class="rule"></span><span>go build one</span></div>

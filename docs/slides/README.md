@@ -29,11 +29,12 @@ It deliberately does **not** assume ROS, depth cameras, or deep-learning math.
 | 10 | Pure pursuit | 0.5 m carrot — why driving looks smooth |
 | 11 | `.toy` DSL | Named skills sequenced in a tiny language |
 | 12 | NL → program | Verbatim trigger, else token-overlap score |
-| 13 | Push the ball | Geometry of the crowd-favorite demo |
-| 14 | Demo menu | Three phrases to try + “3 green dots = go” |
-| 15 | Hacks | p25 depth, stall-as-success, self-heal, … |
-| 16 | Takeaways | Five things to steal for your own project |
-| 17 | Open source | Repo link, key files, come say hi |
+| 13 | Prompt → script | Like Claude Code, not like a VLA: rule-based matcher + hand-written scripts, nothing learned end-to-end |
+| 14 | Push the ball | Geometry of the crowd-favorite demo |
+| 15 | Demo menu | Three phrases to try + “3 green dots = go” |
+| 16 | Hacks | p25 depth, stall-as-success, self-heal, … |
+| 17 | Takeaways | Five things to steal for your own project |
+| 18 | Open source | Repo link, key files, come say hi |
 
 Every constant, trigger phrase and eval number is taken from the source
 (`tb4_claude_nav.py`, `programs/*.toy`, `models/YOLOV8S_SWAP.md`) — same rule
