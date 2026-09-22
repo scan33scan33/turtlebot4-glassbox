@@ -557,7 +557,7 @@
 <div class="deck" id="deck">
 
 <!-- ═══════════════════════════════════════════════════════════
-     1 · TITLE
+     1 · HIGH LEVEL / TITLE
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide on" data-title="Title">
   <div class="eyebrow"><span>Maker Faire</span><span class="rule"></span><span>A Glass-Box Robot</span></div>
@@ -575,16 +575,16 @@
     <div class="title-meta">
       <span><b>open source</b> · github.com/scan33scan33/turtlebot4-glassbox</span>
       <span>ROS&nbsp;2 Jazzy · Python · runtime stays on-robot</span>
-      <span><b>built with</b> Claude Code · <a href="https://arena.ai" target="_blank" rel="noreferrer">Arena.Ai</a></span>
+      <span><b>built with</b> Claude Code · <a href="https://arena.ai" target="_blank" rel="noreferrer">Arena.ai</a></span>
     </div>
   </div>
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     2 · WHAT A VISITOR SEES
+     2 · HIGH LEVEL / VISITOR EXPERIENCE
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="What is this?">
-  <div class="eyebrow"><span>The pitch</span><span class="rule"></span><span>what a visitor sees</span></div>
+  <div class="eyebrow"><span>High level</span><span class="rule"></span><span>what a visitor sees</span></div>
   <h2>A command becomes a <span class="accent">visible plan</span>.</h2>
   <div class="body">
     <div class="loop">
@@ -613,69 +613,29 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     3 · CLAUDE AS THE VLA — BY ANALOGY
+     3 · WHAT IT CAN DO
      ═══════════════════════════════════════════════════════════ -->
-<section class="slide" data-title="Prompt → script">
-  <div class="eyebrow"><span>How behaviors are made</span><span class="rule"></span><span>goal → script</span></div>
-  <h2>Claude is the <span class="accent">VLA</span> — by analogy.</h2>
+<section class="slide" data-title="More demos">
+  <div class="eyebrow"><span>What it can do</span><span class="rule"></span><span>three booth demos</span></div>
+  <h2>Three things it can <span class="accent">do</span>.</h2>
   <div class="body">
-    <p class="tagline" style="max-width:none;">
-      A VLA connects vision + language to actions. Here Claude Code works one level up:
-      a goal and evidence from a run become the next readable robot script.
-    </p>
-    <div class="evolution">
-      <div class="evo-card"><span class="evo-n">1</span><h3>Goal</h3><p>Describe the behavior and success condition.</p></div>
-      <div class="evo-arrow">→</div>
-      <div class="evo-card"><span class="evo-n">2</span><h3>Generate</h3><p>Claude writes or edits a candidate <span class="mono">.toy</span> script.</p></div>
-      <div class="evo-arrow">→</div>
-      <div class="evo-card"><span class="evo-n">3</span><h3>Test</h3><p>The physical robot executes it and records what happened.</p></div>
-      <div class="evo-arrow">→</div>
-      <div class="evo-card reward"><span class="evo-n">4</span><h3>Reward ↺</h3><p>Pass, fail, or score becomes feedback for the next candidate.</p></div>
+    <div class="say-grid">
+      <div class="say"><h3>Push the ball</h3><p>Find it, line up, and shove until the wall stops the robot.</p><div class="phrase"><small>Enter</small>“push the ball to the wall”</div></div>
+      <div class="say"><h3>Follow me</h3><p>Track the nearest person with a <b>1-meter standoff</b>.</p><div class="phrase"><small>Enter</small>“follow me”</div></div>
+      <div class="say"><h3>Push to a marked goal</h3><p>Mark a point on the map. The robot gets behind the ball, shoves, and re-measures to correct drift.</p><div class="phrase"><small>Enter</small>“push the ball to the goal”</div></div>
     </div>
-    <div class="callout">
-      <b>Generate → test → improve → repeat.</b> At showtime, the chosen script runs locally without Claude.
+    <div class="health">
+      <div class="d"></div><div class="d"></div><div class="d"></div>
+      <div><div class="label">3 green dots = go</div><div class="sub">camera · lidar · wheels</div></div>
     </div>
   </div>
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     4 · GLASS BOX
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide light" data-title="Glass box">
-  <div class="eyebrow"><span>Philosophy</span><span class="rule"></span><span>why “glassbox”?</span></div>
-  <h2>The generated program is <span class="accent">inspectable</span>.</h2>
-  <div class="body">
-    <p class="big-quote" style="color:var(--navy);">
-      Before a wheel turns, we can read the script. During a run, we can see the map,
-      path, detections, push line, and active skill.
-    </p>
-    <div class="compare">
-      <div class="card">
-        <h3>Opaque robot policy</h3>
-        <ul class="clean">
-          <li>Motor behavior is buried in learned weights</li>
-          <li>A bad run is hard to explain</li>
-          <li>Fixing it means more data or training</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>This robot</h3>
-        <ul class="clean">
-          <li>Claude proposes readable code</li>
-          <li>A* + geometry decide motion</li>
-          <li>A failed test becomes a specific script change</li>
-        </ul>
-      </div>
-    </div>
-    <div class="callout">At runtime, the only neural net labels objects. It does not steer.</div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     5 · HARDWARE
+     4 · TECHNOLOGY / HARDWARE
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Hardware">
-  <div class="eyebrow"><span>Anatomy</span><span class="rule"></span><span>four parts, one brain</span></div>
+  <div class="eyebrow"><span>Technology · hardware</span><span class="rule"></span><span>four parts, one brain</span></div>
   <h2>Meet the <span class="accent">robot</span>.</h2>
   <div class="body top">
     <div class="hw-grid">
@@ -766,10 +726,69 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     6 · BEHAVIORS / TOY DSL
+     5 · TECHNOLOGY / ARCHITECTURE
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide light" data-title="Glass box">
+  <div class="eyebrow"><span>Technology · architecture</span><span class="rule"></span><span>why “glassbox”?</span></div>
+  <h2>The generated program is <span class="accent">inspectable</span>.</h2>
+  <div class="body">
+    <p class="big-quote" style="color:var(--navy);">
+      Before a wheel turns, we can read the script. During a run, we can see the map,
+      path, detections, push line, and active skill.
+    </p>
+    <div class="compare">
+      <div class="card">
+        <h3>Opaque robot policy</h3>
+        <ul class="clean">
+          <li>Motor behavior is buried in learned weights</li>
+          <li>A bad run is hard to explain</li>
+          <li>Fixing it means more data or training</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>This robot</h3>
+        <ul class="clean">
+          <li>Claude proposes readable code</li>
+          <li>A* + geometry decide motion</li>
+          <li>A failed test becomes a specific script change</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">At runtime, the only neural net labels objects. It does not steer.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     6 · TECHNOLOGY / BEHAVIOR DEVELOPMENT
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide" data-title="Prompt → script">
+  <div class="eyebrow"><span>Technology · development</span><span class="rule"></span><span>goal → script</span></div>
+  <h2>Claude is the <span class="accent">VLA</span> — by analogy.</h2>
+  <div class="body">
+    <p class="tagline" style="max-width:none;">
+      A VLA connects vision + language to actions. Here Claude Code works one level up:
+      a goal and evidence from a run become the next readable robot script.
+    </p>
+    <div class="evolution">
+      <div class="evo-card"><span class="evo-n">1</span><h3>Goal</h3><p>Describe the behavior and success condition.</p></div>
+      <div class="evo-arrow">→</div>
+      <div class="evo-card"><span class="evo-n">2</span><h3>Generate</h3><p>Claude writes or edits a candidate <span class="mono">.toy</span> script.</p></div>
+      <div class="evo-arrow">→</div>
+      <div class="evo-card"><span class="evo-n">3</span><h3>Test</h3><p>The physical robot executes it and records what happened.</p></div>
+      <div class="evo-arrow">→</div>
+      <div class="evo-card reward"><span class="evo-n">4</span><h3>Reward ↺</h3><p>Pass, fail, or score becomes feedback for the next candidate.</p></div>
+    </div>
+    <div class="callout">
+      <b>Generate → test → improve → repeat.</b> At showtime, the chosen script runs locally without Claude.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     7 · TECHNOLOGY / TOY DSL
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Behaviors">
-  <div class="eyebrow"><span>Skills</span><span class="rule"></span><span>a tiny action language</span></div>
+  <div class="eyebrow"><span>Technology · behavior code</span><span class="rule"></span><span>a tiny action language</span></div>
   <h2>Claude writes readable <span class="accent">.toy</span> scripts.</h2>
   <div class="body">
     <div class="row" style="flex:1;">
@@ -812,10 +831,10 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     7 · COMMAND → INSTALLED SCRIPT
+     8 · TECHNOLOGY / RUNTIME SELECTION
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Language match">
-  <div class="eyebrow"><span>Showtime</span><span class="rule"></span><span>command → installed script</span></div>
+  <div class="eyebrow"><span>Technology · selection</span><span class="rule"></span><span>command → installed script</span></div>
   <h2>A tiny matcher chooses <span class="accent">what runs</span>.</h2>
   <div class="body">
     <div class="compare">
@@ -841,10 +860,10 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     8 · SEE → PLAN → MOVE
+     9 · TECHNOLOGY / SEE → PLAN → MOVE
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="The loop">
-  <div class="eyebrow"><span>Robot runtime</span><span class="rule"></span><span>installed script executing</span></div>
+  <div class="eyebrow"><span>Technology · runtime</span><span class="rule"></span><span>installed script executing</span></div>
   <h2>See → Plan → <span class="accent">Move</span>.</h2>
   <div class="body">
     <div class="loop">
@@ -874,10 +893,10 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     9 · VISION
+     10 · DEEP DIVE / VISION
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Vision">
-  <div class="eyebrow"><span>See</span><span class="rule"></span><span>the only neural net in the runtime</span></div>
+  <div class="eyebrow"><span>Deep dive · vision</span><span class="rule"></span><span>the only neural net in the runtime</span></div>
   <h2>Vision in one sentence.</h2>
   <div class="body">
     <p class="tagline" style="max-width:none;">
@@ -907,10 +926,10 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     10 · SIMPLE SENSOR FUSION
+     11 · DEEP DIVE / SENSOR FUSION
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Distance">
-  <div class="eyebrow"><span>See · depth</span><span class="rule"></span><span>simple sensor fusion</span></div>
+  <div class="eyebrow"><span>Deep dive · sensor fusion</span><span class="rule"></span><span>simple and fast</span></div>
   <h2>Two sensors. <span class="accent">One fast line.</span></h2>
   <div class="body">
     <div class="steps">
@@ -935,10 +954,10 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     11 · COST MAP
+     12 · DEEP DIVE / COST MAP
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Cost map">
-  <div class="eyebrow"><span>Plan · map</span><span class="rule"></span><span>where is it safe?</span></div>
+  <div class="eyebrow"><span>Deep dive · cost map</span><span class="rule"></span><span>where is it safe?</span></div>
   <h2>No floor plan? <span class="accent">Draw one live.</span></h2>
   <div class="body">
     <p class="tagline" style="max-width:none;">
@@ -964,10 +983,10 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     12 · A* GAME ANIMATION
+     13 · DEEP DIVE / A* GAME ANIMATION
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="A*">
-  <div class="eyebrow"><span>Plan · pathfinding</span><span class="rule"></span><span>watch it search</span></div>
+  <div class="eyebrow"><span>Deep dive · pathfinding</span><span class="rule"></span><span>watch it search</span></div>
   <h2>A* is the same trick used by a <span class="accent">game character</span>.</h2>
   <div class="body">
     <div class="astar-stage">
@@ -983,10 +1002,10 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     13 · PURE PURSUIT
+     14 · DEEP DIVE / PURE PURSUIT
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="Pure pursuit">
-  <div class="eyebrow"><span>Move · pure pursuit</span><span class="rule"></span><span>the carrot idea</span></div>
+  <div class="eyebrow"><span>Deep dive · motion</span><span class="rule"></span><span>the pure-pursuit carrot</span></div>
   <h2>Put a virtual carrot on the path. Move it <span class="accent">forward</span>.</h2>
   <div class="body">
     <p class="tagline" style="max-width:none;">
@@ -1022,10 +1041,10 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     14 · PUSH DEMO EXPLAINED
+     15 · DEEP DIVE / PUSH DEMO
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="Push the ball">
-  <div class="eyebrow"><span>Demo explained</span><span class="rule"></span><span>stop · look · push</span></div>
+  <div class="eyebrow"><span>Deep dive · one behavior</span><span class="rule"></span><span>stop · look · push</span></div>
   <h2>Robot → ball → wall, <span class="accent">40&nbsp;cm at a time</span>.</h2>
   <div class="body">
     <div class="row" style="flex:1;">
@@ -1063,29 +1082,10 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     15 · DEMO MENU
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide" data-title="More demos">
-  <div class="eyebrow"><span>Demo menu</span><span class="rule"></span><span>try these at the booth</span></div>
-  <h2>Three commands to <span class="accent">try</span>.</h2>
-  <div class="body">
-    <div class="say-grid">
-      <div class="say"><h3>Push the ball</h3><p>Find it, line up, and shove until the wall stops the robot.</p><div class="phrase"><small>Enter</small>“push the ball to the wall”</div></div>
-      <div class="say"><h3>Follow me</h3><p>Track the nearest person with a <b>1-meter standoff</b>.</p><div class="phrase"><small>Enter</small>“follow me”</div></div>
-      <div class="say"><h3>Push to a marked goal</h3><p>Mark a point on the map. The robot gets behind the ball, shoves, and re-measures to correct drift.</p><div class="phrase"><small>Enter</small>“push the ball to the goal”</div></div>
-    </div>
-    <div class="health">
-      <div class="d"></div><div class="d"></div><div class="d"></div>
-      <div><div class="label">3 green dots = go</div><div class="sub">camera · lidar · wheels</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     16 · FIELD HACKS
+     16 · DIFFICULTY / FIELD HACKS
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Hacks">
-  <div class="eyebrow"><span>Reality</span><span class="rule"></span><span>problem → reason → fix</span></div>
+  <div class="eyebrow"><span>Difficulty</span><span class="rule"></span><span>problem → reason → fix</span></div>
   <h2>Every hack has a <span class="accent">why</span>.</h2>
   <div class="body">
     <div class="hack-grid">
@@ -1114,10 +1114,10 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     17 · OPEN SOURCE / END
+     17 · END / OPEN SOURCE
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Open source">
-  <div class="eyebrow"><span>Open source</span><span class="rule"></span><span>go build one</span></div>
+  <div class="eyebrow"><span>End · open source</span><span class="rule"></span><span>go build one</span></div>
   <div class="title-hero">
     <h1 class="end-title">Every script, skill,<br>and planner is here.</h1>
     <div class="end-links">
@@ -1130,7 +1130,7 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
       <span class="chip">MIT code</span><span class="chip">ROS 2 Jazzy</span><span class="chip">Python</span><span class="chip">runs on a Pi 4</span>
     </div>
     <p class="tagline end-cta">
-      This stack was built with <b>Claude Code</b> on <a href="https://arena.ai" target="_blank" rel="noreferrer">Arena.Ai</a>.<br>
+      This stack was built with <b>Claude Code</b> on <a href="https://arena.ai" target="_blank" rel="noreferrer">Arena.ai</a>.<br>
       Questions? Want to drive it? <b class="amber">Come say hi.</b>
     </p>
   </div>
