@@ -90,6 +90,8 @@ PROG_M          = 0.010   # m of odom travel that counts as progress (see _push_
 PUSH_GOAL_ALIGN = 0.12    # rad — heading error tolerated before starting a push
 PUSH_SEG_TIME   = 25.0    # s — one push segment, then re-find & re-line-up
 FOLLOW_STANDOFF = 1.0     # m — never approach a person closer than this
+FOLLOW_STANDOFF_CLOSE = 0.7  # m — for the small/low targets in _FOLLOW_CLOSE: at 1 m
+                             #     the 416-px preview loses them (see _follow_params)
 PUSH_CLEAR_R  = 0.35      # m — radius around a push target cleared of obstacle cost so
                           #     A* can path INTO the object instead of routing around it
 HEADING_TOL   = 0.20      # rad
@@ -167,7 +169,13 @@ _state = {
     "cmd_sent":           None,   # last twist actually published {v, w, t} (recorder ground truth)
     "use_lidar_dist":     True,   # True: dist=min(OAK stereo, lidar@bearing); False: raw OAK
     "target_color":       None,   # colour-targeted command: only match balls of this colour
-    "follow_target":      None,   # 'follow the X' -> COCO object to follow (overrides name)
+    # Follow-command parameters, all resolved from the spoken phrase in ONE place
+    # (_follow_params) and consumed by NavRobot.follow — so programs/follow.toy
+    # and the skill cannot disagree about what was asked for.
+    "follow_target":      None,   # 'follow the X' -> COCO object to follow (None = person)
+    "follow_standoff":    None,   # m to stop short of it (1.0 big targets, 0.7 small)
+    "follow_scan_first":  False,  # step-and-stare sweep before following (small targets)
+    "follow_fast":        False,  # lidar + velocity predictor (small targets only)
     # Navigation
     "destination":        "",
     "status":             "idle",
@@ -488,14 +496,10 @@ _NAMED_RGB = {
 _NAMED_LAB = {n: cv2.cvtColor(np.uint8([[list(rgb)]]), cv2.COLOR_RGB2LAB)[0, 0].astype(float)
               for n, rgb in _NAMED_RGB.items()}
 
-COCO_CLASSES = ['person','bicycle','car','motorbike','aeroplane','bus','train','truck','boat',
- 'traffic light','fire hydrant','stop sign','parking meter','bench','bird','cat','dog','horse','sheep',
- 'cow','elephant','bear','zebra','giraffe','backpack','umbrella','handbag','tie','suitcase','frisbee',
- 'skis','snowboard','sports ball','kite','baseball bat','baseball glove','skateboard','surfboard',
- 'tennis racket','bottle','wine glass','cup','fork','knife','spoon','bowl','banana','apple','sandwich',
- 'orange','broccoli','carrot','hot dog','pizza','donut','cake','chair','sofa','pottedplant','bed',
- 'diningtable','toilet','tvmonitor','laptop','mouse','remote','keyboard','cell phone','microwave','oven',
- 'toaster','sink','refrigerator','book','clock','vase','scissors','teddy bear','hair drier','toothbrush']
+# COCO_CLASSES used to live here: a byte-identical copy of COCO_LABELS above (the
+# same 80 labels, in the same order — and models/nn_*.json held three more copies).
+# Use COCO_LABELS. The detector's class_id vocabulary and the follow-target
+# vocabulary are the same vocabulary and must not be able to drift.
 
 _FOLLOW_SYNONYM = {   # everyday word -> the model's label
  'couch':'sofa','tv':'tvmonitor','television':'tvmonitor','monitor':'tvmonitor','plant':'pottedplant',
@@ -503,18 +507,107 @@ _FOLLOW_SYNONYM = {   # everyday word -> the model's label
  'airplane':'aeroplane','plane':'aeroplane','phone':'cell phone','cellphone':'cell phone',
  'ball':'sports ball','puppy':'dog','doggy':'dog','kitty':'cat','fridge':'refrigerator',
  'teddy':'teddy bear','bike':'bicycle'}
-_FOLLOW_VERBS = (' follow ',' trail ',' tail ',' chase ',' come with ',' stay with ',' keep near ',' keep close ')
 
-def _parse_follow_target(text):
-    """For a 'follow ...' command, the COCO object to follow (the model's own
-    label, incl. synonyms couch->sofa); None if not a follow command / no match."""
-    t = ' ' + re.sub(r'\s+',' ', re.sub(r'[^a-z ]',' ',(text or '').lower())) + ' '
-    if not any(v in t for v in _FOLLOW_VERBS):
-        return None
-    for word,label in sorted(list(_FOLLOW_SYNONYM.items())+[(c,c) for c in COCO_CLASSES],key=lambda kv:-len(kv[0])):
-        if ' '+word+' ' in t:
+# Words that mean "follow". This is the ONLY list that decides whether a phrase is
+# a follow command — and since programs/follow.toy is the only follow program, it
+# also decides which phrases reach it. 'track' used to appear only in the .toy
+# `# triggers:` lines and not here; that drift is what made follow_dog.toy
+# impossible to merge ("track the dog" reached a dog only via that file's literal
+# trigger, because _parse_follow_target returned None and /run fell through).
+_FOLLOW_VERBS = (' follow ',' trail ',' tail ',' chase ',' track ',' come with ',
+                 ' stay with ',' keep near ',' keep close ')
+
+# Small, low targets that need the ball treatment: a closer standoff AND a
+# step-and-stare SCAN_FOR before following begins. Both come from the same
+# physics — at 1 m the 416-px preview loses a ~40 cm ball, and FOLLOW's
+# re-acquire is a CONTINUOUS spin, which the OAK detects poorly through (motion
+# blur at low fps), so it sails straight past. Anything not listed gets the
+# person/dog treatment: start following at once (FOLLOW's own sweep re-finds a
+# big target fine) at a 1 m standoff. This is the one place to add a newly-tuned
+# small object; only the ball case is field-proven, so keep the list honest.
+_FOLLOW_CLOSE = {'sports ball','apple','bottle','cup','wine glass','frisbee','teddy bear'}
+
+# Words that mean "follow it hard": use the lidar + velocity predictor
+# (follow_ball_fast) instead of the plain camera loop. Honoured ONLY for
+# _FOLLOW_CLOSE targets — the predictor gates on _lidar_ball(), which hunts a
+# close convex blob sticking out nearer than the wall behind it. That is a sensor
+# model for a ~40 cm object on the floor; it is wrong for a person or a dog, and
+# unnecessary, since the camera holds those in frame at ~2 fps anyway.
+_FOLLOW_FAST_WORDS = ('aggressive','aggressively','fast','faster','quick','quickly',
+                      'hard','predict','race','sprint','track','tracking')
+
+def _norm_phrase(text):
+    """Lowercase, drop non-letters, pad with spaces so words can be matched whole."""
+    return ' ' + re.sub(r'\s+',' ', re.sub(r'[^a-z ]',' ',(text or '').lower())) + ' '
+
+def _parse_named_target(text):
+    """The COCO object named in `text` (the model's own label, incl. synonyms
+    couch->sofa), else None. Deliberately does NOT require a follow verb — the
+    callers decide whether the phrase is a follow command."""
+    t = _norm_phrase(text)
+    for word, label in sorted(list(_FOLLOW_SYNONYM.items()) + [(c, c) for c in COCO_LABELS],
+                              key=lambda kv: -len(kv[0])):
+        if ' ' + word + ' ' in t:
             return label
     return None
+
+
+def _parse_follow_target(text):
+    """For a 'follow ...' command, the COCO object to follow; None if the phrase
+    is not a follow command, or names nothing ("follow me" -> None -> person)."""
+    t = _norm_phrase(text)
+    if not any(v in t for v in _FOLLOW_VERBS):
+        return None
+    return _parse_named_target(text)
+
+
+def _parse_follow_fast(text):
+    """True if the phrase asks to follow hard (see _FOLLOW_FAST_WORDS)."""
+    t = _norm_phrase(text)
+    return any((' ' + w + ' ') in t for w in _FOLLOW_FAST_WORDS)
+
+def _is_close_target(name):
+    """Does this target need the ball treatment (close standoff + scan first)?
+
+    Accepts both the COCO label ('sports ball', what _parse_follow_target
+    returns) and the everyday names a hand-written .toy or the detector's own
+    aliasing produces ('ball', 'apple') — _live_det already treats a ball and an
+    apple as the same object, so the follow parameters must agree with it.
+    """
+    n = (name or '').lower()
+    return n in _FOLLOW_CLOSE or 'ball' in n
+
+def _follow_params(text):
+    """Resolve a spoken phrase into everything `programs/follow.toy` needs.
+
+    ONE place decides follow behaviour. It used to be spread over four .toy files
+    (follow / follow_dog / follow_ball / follow_ball_aggressive), each hard-coding
+    a target and a standoff — and two of them were unreachable, because /run's
+    generic-follow special case fires before the matcher for any phrase naming a
+    COCO object. Now: one program, one table, and the target-specific knowledge
+    (standoff, whether to scan first, whether to predict) lives here where it can
+    be unit-tested instead of being encoded in DSL text.
+
+    Returns {'target','standoff','scan_first','fast'}. target None means the
+    phrase named nothing ("follow me"), which follow.toy reads as 'person'.
+    """
+    target = _parse_follow_target(text)
+    fast   = _parse_follow_fast(text)
+    if target is None and fast:
+        # "predict the ball" asks for the fast treatment but uses no follow verb,
+        # so _parse_follow_target found nothing. Honour it only when a small/low
+        # target is actually named — that is the only case the predictor's lidar
+        # model is valid for, so a stray 'fast' elsewhere stays a no-op.
+        named = _parse_named_target(text)
+        if _is_close_target(named):
+            target = named
+    close  = _is_close_target(target)
+    return {
+        'target':     target,
+        'standoff':   FOLLOW_STANDOFF_CLOSE if close else FOLLOW_STANDOFF,
+        'scan_first': close,
+        'fast':       close and fast,
+    }
 
 
 def _parse_color(text):
@@ -1781,17 +1874,48 @@ class NavRobot:
         _set(status='push-to-goal timed out')
         return 'timeout'
 
-    def follow_human(self, name='person', standoff=FOLLOW_STANDOFF, max_time=900):
-        """Follow the CLOSEST `name` (person) to help them carry things, while
-        AVOIDING OBSTACLES on the way. Unlike push mode, this uses the move-mode
-        A* planner — it routes around furniture and stops short of things. It
-        continuously sets a goal a `standoff` short of the person and lets the
-        nav loop drive there; holds when already within standoff (never crowds
-        them); if they drop out of view it briefly holds, then TURNS toward
-        where they were last seen and sweeps until it re-acquires them. Runs
-        until Stop or max_time."""
+    def follow(self, name=None, standoff=None, fast=None, max_time=900):
+        """Follow the CLOSEST `name`, AVOIDING OBSTACLES on the way — a person to
+        help them carry things, a dog, a ball, anything nameable.
+
+        What to follow, how close to stand, whether to acquire it with a
+        step-and-stare sweep first, and whether to use the lidar predictor are
+        resolved from the spoken phrase by _follow_params() and passed in through
+        state — which is why ONE programs/follow.toy covers every target instead
+        of four near-identical programs. Explicit arguments (a hand-written .toy,
+        or a test) take precedence over state; `fast` asks for the predictor and
+        is the third DSL argument, FOLLOW(name, standoff, fast).
+
+        Unlike push mode this uses the move-mode A* planner — it routes around
+        furniture and stops short of things, never pushing. It continuously sets
+        a goal a `standoff` short of the target and lets the nav loop drive
+        there; holds when already within standoff (never crowds it); if the
+        target drops out of view it briefly holds, then TURNS toward where it was
+        last seen and sweeps until re-acquired. Runs until Stop or max_time.
+
+        Returns 'done' / 'not-found' / 'no-robot'."""
         if not ros_node: return 'no-robot'
-        name = _get('follow_target') or name               # 'follow the X' overrides the default
+        name     = name or _get('follow_target') or 'person'
+        standoff = standoff or _get('follow_standoff') or FOLLOW_STANDOFF
+        if fast is None: fast = bool(_get('follow_fast'))
+        close = _is_close_target(name)
+        # The predictor's lidar model (_lidar_ball) hunts a close convex blob
+        # sticking out nearer than the wall behind it — a sensor model for a small
+        # object on the floor. It is not applied to a person or a dog even if a
+        # hand-written .toy asks for it; the camera holds those in frame anyway.
+        fast = bool(fast) and close
+        if bool(_get('follow_scan_first')) or fast:
+            # Small, low target: FOLLOW's own re-acquire is a CONTINUOUS spin,
+            # which the OAK detects poorly through (motion blur at low fps), so it
+            # sails past a ball. scan_for steps and stares instead. Give up rather
+            # than orbit an empty room for max_time — that is what follow_ball.toy
+            # used to encode as `PRINT "No ball found in the room."`.
+            _set(status=f'looking for the {name} before following')
+            if self.scan_for(name, 360.0) is None:
+                ros_node.stop()
+                return 'not-found'
+        if fast:
+            return self.follow_ball_fast(name, standoff, max_time)
         t0 = time.time(); lost = 0; last_side = 1.0        # +1 = last seen on the left
         _set(status=f'following a {name} (obstacle-aware)')
         while time.time() - t0 < max_time:
@@ -1836,7 +1960,13 @@ class NavRobot:
         ~2fps); the lidar tracks its blob between camera frames (~8fps), gated to
         the predicted spot; when neither confirms, EXTRAPOLATE along its velocity;
         after ~1.5s unconfirmed, decay to a scan. Drives obstacle-aware (move
-        mode) to a standoff short of the belief -- never rams it (not push)."""
+        mode) to a standoff short of the belief -- never rams it (not push).
+
+        Not a DSL primitive of its own any more: `follow` delegates here when
+        _follow_params() resolves `fast` for a small target, so a .toy asks for it
+        with FOLLOW(name, standoff, 1) rather than a separate verb. That keeps the
+        predictor's validity condition (small, low, floor-level object) checked in
+        one place instead of at every call site."""
         if not ros_node: return 'no-robot'
         t0 = time.time()
         bx = by = None; vx = vy = 0.0; t_conf = 0.0; hist = []
@@ -1935,7 +2065,6 @@ _PLAN_PHRASE = {
     'PUSH_TO_WALL': 'push it to the wall',
     'PUSH_TO_GOAL': 'line up behind the ball & push it to your goal',
     'FOLLOW':       'follow the target',
-    'FOLLOW_FAST':  'follow (predict + lidar-track)',
     'GO_TO':        'drive to the spot',
     'POINT':        'turn to face it',
 }
@@ -2045,7 +2174,8 @@ def _run_program(meta):
         # early must not leave the next drive in push mode (different hazard
         # handling), so reset it here along with the other per-run state.
         _set(run_active=False, nav_active=False, target_color=None,
-             follow_target=None, goal_mode='move', push_from=None, ball_mark=None)
+             follow_target=None, follow_standoff=None, follow_scan_first=False,
+             follow_fast=False, goal_mode='move', push_from=None, ball_mark=None)
 
 
 # ── Flask routes ──────────────────────────────────────────────────────────────
@@ -2091,6 +2221,14 @@ def get_state():
             'plan':         _state['plan'],
             'target_color': _state['target_color'],
             'follow_target': _state['follow_target'],
+            # Glass-box: what the phrase was understood to ask for, so you can see
+            # why the robot is standing 0.7 m off a ball but 1.0 m off you.
+            'follow': {
+                'target':     _state['follow_target'],
+                'standoff':   _state['follow_standoff'],
+                'scan_first': _state['follow_scan_first'],
+                'fast':       _state['follow_fast'],
+            },
         })
     resp.headers['Cache-Control'] = 'no-store'   # never serve a stale /state from browser cache
     return resp
@@ -2109,26 +2247,37 @@ def run_program():
         return jsonify({'ok': False, 'error': 'robot is docked — undock first (wheels are disabled)'}), 409
     data = request.get_json(force=True)
     progs = load_programs()
+    text = data.get('text', '')
+    # Resolve the follow parameters from the phrase ONCE. This route used to call
+    # _parse_follow_target twice (once to route, once to set state), which is how
+    # the routing and the skill could end up disagreeing.
+    fp = _follow_params(text)
     if data.get('program'):
         meta = progs.get(data['program'])
         if not meta: return jsonify({'ok': False, 'error': 'no such program'}), 404
         matched, score = meta, 1.0
+    elif fp['target'] and progs.get('follow'):
+        # "follow the <COCO object>" — the phrase already named the target, so go
+        # straight to the one follow program. The token-overlap matcher gets no
+        # say here. Safe now that follow.toy is the ONLY follow program: this
+        # special case used to fire ahead of three other programs' own triggers.
+        matched, score = progs['follow'], 1.0
     else:
-        _ftgt = _parse_follow_target(data.get('text', ''))
-        if _ftgt and progs.get('follow'):
-            matched, score = progs['follow'], 1.0        # generic 'follow the <COCO object>'
-        else:
-            matched, score = match_program(data.get('text', ''), progs)
-            if not matched or score <= 0:
-                return jsonify({'ok': False, 'error': 'no matching program',
-                                'available': list(progs)}), 404
-    _set(target_color=_parse_color(data.get('text', '')),
-         follow_target=_parse_follow_target(data.get('text', '')),
-         last_command=(data.get('text') or matched['name']),
+        matched, score = match_program(text, progs)
+        if not matched or score <= 0:
+            return jsonify({'ok': False, 'error': 'no matching program',
+                            'available': list(progs)}), 404
+    _set(target_color=_parse_color(text),
+         follow_target=fp['target'],
+         follow_standoff=fp['standoff'],
+         follow_scan_first=fp['scan_first'],
+         follow_fast=fp['fast'],
+         last_command=(text or matched['name']),
          match_score=round(score, 2),
          plan=matched.get('plan') or [])
     threading.Thread(target=_run_program, args=(matched,), daemon=True).start()
     return jsonify({'ok': True, 'program': matched['name'], 'target_color': _get('target_color'),
+                    'follow': fp,
                     'description': matched['description'], 'score': round(score, 3)})
 
 @app.route('/run_stop', methods=['POST'])

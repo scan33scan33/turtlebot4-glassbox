@@ -51,7 +51,7 @@ startup, so one glance confirms which detector is live:
 ## Watch during the A/B
 - **Ball recall** — the reason for the swap. Offline: yolov8s AP 0.83 vs v5mu 0.60 (issue #4). Confirm it survives the on-device ÷255 + FP16 quantization.
 - **FPS / X_LINK health** — v8s blob is **6-shave** vs v5mu's 5-shave; with `nn.i_num_inference_threads: 2` that's 6×2=12 shaves (OAK-D-Lite has 16, OK). If X_LINK errors or FPS drops, set `i_num_inference_threads: 1` first, then consider lowering `rgb.i_fps` (see [[oakd-fps-preference]]) before giving up.
-- **Person** — should tie (offline 0.80 vs 0.79). Don't regress follow_human.
+- **Person** — should tie (offline 0.80 vs 0.79). Don't regress `follow` ("follow me").
 
 ## Regenerate the blob from scratch (if ever needed)
 ```bash

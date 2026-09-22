@@ -12,8 +12,15 @@ Primitives (provided by a Robot binding):
     PUSH_TO_WALL([name])   lidar-goal + camera-steer wall push     -> "pinned"/...
     PUSH_TO_GOAL([x, y])   push the ball to a human-set goal       -> "at goal"/...
                            (no args = the goal marked in the web UI)
-    FOLLOW([name][, m])    follow at a standoff (move, not push)   -> "done"
-    FOLLOW_FAST([name][, m]) follow w/ velocity belief + lidar     -> "done"
+    FOLLOW([name][, m][, fast])
+                           follow at a standoff (move, not push)   -> "done"/"not-found"
+                           With NO arguments the target, the standoff and `fast`
+                           come from whatever the spoken phrase resolved to (the
+                           navigator's _follow_params), which is why a single
+                           programs/follow.toy covers a person, a dog and a ball.
+                           Explicit arguments override that. `fast` TRUE picks the
+                           lidar + velocity predictor, and only applies to small
+                           targets (it replaces the old FOLLOW_FAST primitive).
 Built-ins (pure):
     POINT(x, y)            make a {x,y} value
     PRINT expr             log a line
@@ -250,8 +257,14 @@ class Interpreter:
         elif N == "PUSH_THROUGH": a = [self._num(args[0]) if len(args) > 0 else 0.70];                fn = self.robot.push_through
         elif N == "PUSH_TO_WALL": a = [str(args[0]) if args else "ball"];                              fn = self.robot.push_to_wall
         elif N == "PUSH_TO_GOAL": a = [self._num(args[0]), self._num(args[1])] if len(args) >= 2 else []; fn = self.robot.push_to_goal
-        elif N == "FOLLOW":       a = [str(args[0]) if args else "person", self._num(args[1]) if len(args) > 1 else 1.0]; fn = self.robot.follow_human
-        elif N == "FOLLOW_FAST":  a = [str(args[0]) if args else "ball", self._num(args[1]) if len(args) > 1 else 0.7]; fn = self.robot.follow_ball_fast
+        # FOLLOW with no arguments is the normal case: the program defers target,
+        # standoff and predictor to what the spoken phrase resolved to, so one
+        # follow.toy covers every target. Explicit arguments override that, so a
+        # hand-written .toy can still pin a value. FOLLOW(name, m, TRUE) replaces
+        # the old FOLLOW_FAST primitive.
+        elif N == "FOLLOW":       a = ([str(args[0])] if len(args) > 0 else []) \
+                                    + ([self._num(args[1])] if len(args) > 1 else []) \
+                                    + ([self._truthy(args[2])] if len(args) > 2 else []); fn = self.robot.follow
         elif N == "EXPLORE":      a = [self._num(args[0]) if args else 900];                            fn = self.robot.explore_open
         else:
             raise NameError(f"unknown primitive '{name}'")
@@ -333,10 +346,17 @@ class MockRobot:
             t["x"] += ux*step; t["y"] += uy*step
             self.x, self.y = t["x"] - ux*0.55, t["y"] - uy*0.55
         self.log("  [robot] PUSH_TO_GOAL: timed out"); return "timeout"
-    def follow_human(self, name="person", standoff=1.0, max_time=900):
-        self.log(f"  [robot] FOLLOW {name} standoff={standoff:.1f}m"); return "done"
-    def follow_ball_fast(self, name="ball", standoff=0.7, max_time=900):
-        self.log(f"  [robot] FOLLOW_FAST {name} standoff={standoff:.1f}m"); return "done"
+    def follow(self, name=None, standoff=None, fast=None, max_time=900):
+        """Mirror NavRobot.follow's resolution with no ROS state to read: no
+        argument means the everyday default (a person at 1 m), a small target
+        means a closer standoff."""
+        name = name or "person"
+        if standoff is None:
+            standoff = 0.7 if "ball" in name.lower() else 1.0
+        fast = bool(fast)
+        self.log(f"  [robot] FOLLOW {name} standoff={standoff:.1f}m"
+                 + (" (predict + lidar-track)" if fast else ""))
+        return "done"
     def explore_open(self, max_time=900, reach=2.0):
         self.log(f"  [robot] EXPLORE max_time={max_time}"); return "done"
     def find(self, name):

@@ -438,9 +438,145 @@ class TestProgramWiring(unittest.TestCase):
         progs = tb4.load_programs()
         for text, want in (('push the ball to the wall', 'push_ball_to_wall'),
                            ('push to wall', 'push_to_wall'),
-                           ('follow me', 'follow_human')):
+                           # follow_human was folded into the generic `follow`
+                           # program; its phrases must now land there.
+                           ('follow me', 'follow')):
             self.assertEqual(tb4.match_program(text, progs)[0]['name'], want, text)
 
+    def test_every_follow_phrase_reaches_the_one_program(self):
+        """follow_human / follow_dog / follow_ball / follow_ball_aggressive were
+        four .toy files that differed only in a target, a standoff and a
+        controller choice -- all of which follow from WHAT you named. They are now
+        one program, so every phrase that used to reach any of them must still
+        reach `follow` (and nothing may resolve to a deleted name)."""
+        progs = tb4.load_programs()
+        for gone in ('follow_human', 'follow_dog', 'follow_ball',
+                     'follow_ball_aggressive'):
+            self.assertNotIn(gone, progs)
+        for text in ('follow me', 'help me carry', 'carry mode',
+                     'follow the human', 'follow person', 'come with me',
+                     'follow the dog', 'chase the dog', 'track the dog',
+                     'follow the puppy', 'come with dog',
+                     'follow the ball', 'chase the ball', 'trail the ball',
+                     'track the ball', 'predict the ball',
+                     'follow the ball aggressively', 'chase the ball fast'):
+            matched, _ = tb4.match_program(text, progs)
+            self.assertEqual(matched['name'], 'follow', text)
+
+    def test_follow_program_hardcodes_no_target(self):
+        """The single follow.toy must ask the skill to follow with NO arguments,
+        so target/standoff/fast come from the phrase via state rather than from
+        DSL text. A literal baked into the .toy is how the duplication crept back
+        in last time."""
+        import toyscript
+        progs = tb4.load_programs()
+
+        class Rec(toyscript.MockRobot):
+            def __init__(self):
+                super().__init__(log=lambda *a: None)
+                self.calls = []
+
+            def follow(self, *a, **k):
+                self.calls.append((a, k))
+                return 'done'
+
+        rec = Rec()
+        toyscript.Interpreter(rec, log=lambda *a: None).run(progs['follow']['source'])
+        self.assertEqual(rec.calls, [((), {})],
+                         "follow.toy should call FOLLOW() bare")
+
+    def test_dsl_follow_takes_zero_to_three_arguments(self):
+        """FOLLOW() is the normal form (everything comes from the phrase), but a
+        hand-written .toy or a test must still be able to pin a target, a
+        standoff and the predictor. The third argument replaces the deleted
+        FOLLOW_FAST verb, so dispatch has to accept all four arities."""
+        import toyscript
+
+        class Rec(toyscript.MockRobot):
+            def __init__(self):
+                super().__init__(log=lambda *a: None)
+                self.calls = []
+
+            def follow(self, *a, **k):
+                self.calls.append(a)
+                return 'done'
+
+        for src, want in (('SET r = FOLLOW()',                ()),
+                          ('SET r = FOLLOW("dog")',           ('dog',)),
+                          ('SET r = FOLLOW("dog", 1.5)',      ('dog', 1.5)),
+                          ('SET r = FOLLOW("ball", 0.7, 1)',  ('ball', 0.7, True)),
+                          ('SET r = FOLLOW("ball", 0.7, 0)',  ('ball', 0.7, False))):
+            rec = Rec()
+            toyscript.Interpreter(rec, log=lambda *a: None).run(src)
+            self.assertEqual(rec.calls, [want], src)
+        # FOLLOW_FAST is gone: it must be an unknown primitive, not a silent no-op
+        with self.assertRaises(NameError):
+            toyscript.Interpreter(Rec(), log=lambda *a: None).run(
+                'SET r = FOLLOW_FAST("ball", 0.7)')
+
+    def test_track_the_dog_still_follows_a_dog(self):
+        """Regression guard for the merge that started this: 'track' was NOT in
+        _FOLLOW_VERBS, so "track the dog" parsed to nothing and only worked
+        because follow_dog.toy declared it as a literal trigger. Now that the verb
+        list and the programs are one source of truth, 'track' parses -- and a dog
+        must get the big-target treatment (follow at once, 1 m standoff, no lidar
+        predictor), exactly as follow_dog used to."""
+        self.assertEqual(tb4._parse_follow_target('track the dog'), 'dog')
+        p = tb4._follow_params('track the dog')
+        self.assertEqual(p['target'], 'dog')
+        self.assertEqual(p['standoff'], tb4.FOLLOW_STANDOFF)
+        self.assertFalse(p['scan_first'])
+        self.assertFalse(p['fast'])
+
+    def test_small_targets_get_the_close_standoff_and_a_scan_first(self):
+        """A ~40 cm object is lost at 1 m in the 416-px preview, and FOLLOW's
+        re-acquire is a CONTINUOUS spin the OAK detects poorly through -- so small
+        targets stand off closer and are acquired step-and-stare. Big targets
+        start following at once, because FOLLOW's own sweep re-finds them."""
+        for text, want in (('follow the ball', 'sports ball'),
+                           ('chase the ball', 'sports ball'),
+                           ('follow the bottle', 'bottle'),
+                           ('follow the cup', 'cup')):
+            p = tb4._follow_params(text)
+            self.assertEqual(p['target'], want, text)
+            self.assertEqual(p['standoff'], tb4.FOLLOW_STANDOFF_CLOSE, text)
+            self.assertTrue(p['scan_first'], text)
+            self.assertFalse(p['fast'], text)
+        for text, want in (('follow me', None),
+                           ('follow the dog', 'dog'),
+                           ('follow the person', 'person'),
+                           ('follow the cat', 'cat')):
+            p = tb4._follow_params(text)
+            self.assertEqual(p['target'], want, text)
+            self.assertEqual(p['standoff'], tb4.FOLLOW_STANDOFF, text)
+            self.assertFalse(p['scan_first'], text)
+            self.assertFalse(p['fast'], text)
+
+    def test_the_lidar_predictor_stays_reachable_for_balls_only(self):
+        """follow_ball_aggressive.toy was the only caller of FOLLOW_FAST, and
+        /run's special case shadowed it for every phrase except "track/predict the
+        ball" -- so the skill was nearly unreachable. It must stay reachable for
+        ball phrases that ask to follow hard, and be REFUSED for big targets: its
+        lidar model hunts a close blob on the floor, wrong for a person or dog."""
+        for text in ('track the ball', 'predict the ball',
+                     'follow the ball aggressively', 'aggressive ball follow',
+                     'chase the ball fast', 'follow the ball fast'):
+            p = tb4._follow_params(text)
+            self.assertTrue(p['fast'], text)
+            self.assertEqual(p['standoff'], tb4.FOLLOW_STANDOFF_CLOSE, text)
+        for text in ('follow the dog fast', 'follow me quickly',
+                     'track the person aggressively', 'chase the cat hard'):
+            self.assertFalse(tb4._follow_params(text)['fast'], text)
+
+    def test_a_fast_word_alone_does_not_invent_a_target(self):
+        """'fast'/'track'/'predict' with no small object named must not
+        manufacture a ball to follow -- that would turn an unrelated phrase into a
+        floor-hunting predictor run."""
+        for text in ('go fast', 'that was quick', 'predict the weather',
+                     'track my package'):
+            p = tb4._follow_params(text)
+            self.assertIsNone(p['target'], text)
+            self.assertFalse(p['fast'], text)
     def test_dsl_dispatches_push_to_goal(self):
         import toyscript
 
