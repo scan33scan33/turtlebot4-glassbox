@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fetch the deployed OAK-D YOLO blobs into models/.
+# Fetch the deployed OAK-D YOLO blobs into object_detection/.
 #
 # The blobs are published as GitHub Release assets rather than committed, so a
 # clone stays small and the repository does not redistribute AGPL-3.0-derived
@@ -20,7 +20,7 @@ TAG=${TB4_MODELS_TAG:-models-v1}
 # Default to the checkout this script lives in, so it works from any cwd.
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ROOT=${TB4_ROOT:-$(dirname -- "$HERE")}
-DEST="$ROOT/models"
+DEST="$ROOT/object_detection"
 
 FORCE=0
 [ "${1:-}" = "--force" ] && FORCE=1
@@ -91,8 +91,8 @@ this at your own Release:
 
     TB4_MODELS_REPO=<owner>/<name> bash scripts/download_models.sh
 
-You can also build the blobs yourself — see models/README.md and
-models/YOLOV8S_SWAP.md for the ultralytics + luxonis/tools export steps.
+You can also build the blobs yourself — see object_detection/README.md and
+object_detection/YOLOV8S_SWAP.md for the ultralytics + luxonis/tools export steps.
 MSG
     exit "$rc"
 fi

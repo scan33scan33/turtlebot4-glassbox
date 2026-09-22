@@ -51,4 +51,4 @@ cam_frame.jpg
 test_dataset/
 
 # regenerable export artifact
-models/yolov8s.onnx
+object_detection/yolov8s.onnx

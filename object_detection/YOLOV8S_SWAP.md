@@ -1,7 +1,7 @@
 # Staged: yolov8s detector swap (config-only) — see issue #4
 
 Everything needed to A/B **yolov8s** against the deployed **yolov5mu** is in place.
-Nothing is wired in yet — the launch still defaults to v5mu (`models/DEFAULT_MODEL`).
+Nothing is wired in yet — the launch still defaults to v5mu (`object_detection/DEFAULT_MODEL`).
 Flipping is one environment variable; there is no source edit to make.
 
 ## Artifacts
@@ -32,19 +32,19 @@ sudo systemctl edit tb4-oakd        # drop-in, survives package updates
 sudo systemctl restart tb4-oakd
 ```
 
-To make v8s the default permanently, change the one line in `models/DEFAULT_MODEL`
+To make v8s the default permanently, change the one line in `object_detection/DEFAULT_MODEL`
 and commit that.
 
 ## Rollback
 Drop the override (or the systemd drop-in) and restart — the launch falls back to
-`models/DEFAULT_MODEL`, which is still v5mu. Both blobs stay on disk, so the A/B
+`object_detection/DEFAULT_MODEL`, which is still v5mu. Both blobs stay on disk, so the A/B
 is a restart, not a redeploy.
 
 **Check the swap actually took:** `run_oakd.sh` prints the resolved pair at
 startup, so one glance confirms which detector is live:
 ```
 [oakd] nn config : /tmp/tb4_nn_yolov8s_416_fixed_6shave.json
-[oakd] nn blob   : /home/ubuntu/Workspace/turtlebot4-glassbox/models/yolov8s_416_fixed_6shave.blob
+[oakd] nn blob   : /home/ubuntu/Workspace/turtlebot4-glassbox/object_detection/yolov8s_416_fixed_6shave.blob
 ```
 
 
@@ -56,10 +56,10 @@ startup, so one glance confirms which detector is live:
 ## Regenerate the blob from scratch (if ever needed)
 ```bash
 # 1) ONNX at deploy size (reproducible):
-python -c "from ultralytics import YOLO; YOLO('models/yolov8s.pt').export(format='onnx', imgsz=416, opset=12, simplify=True)"
+python -c "from ultralytics import YOLO; YOLO('object_detection/yolov8s.pt').export(format='onnx', imgsz=416, opset=12, simplify=True)"
 # 2) ONNX -> RVC2 blob + json via luxonis tools (does the YOLO head surgery for on-device decode):
 pip install 'git+https://github.com/luxonis/tools.git'
-tools models/yolov8s.onnx --imgsz 416 --use-rvc2       # or web UI: https://tools.luxonis.com
+tools object_detection/yolov8s.onnx --imgsz 416 --use-rvc2       # or web UI: https://tools.luxonis.com
 ```
 Note: a raw ultralytics ONNX output is `(1,84,3549)` — the luxonis tools reshape the
 head into the separate tensors DepthAI's on-device YOLO decoder expects. A mis-compiled

@@ -14,12 +14,12 @@ import json
 import os
 import tempfile
 
-# Which compiled blob to run. The default lives in models/DEFAULT_MODEL so this
+# Which compiled blob to run. The default lives in object_detection/DEFAULT_MODEL so this
 # file and the startup preflight in run_oakd.sh / services/tb4-oakd-run.sh cannot
 # drift apart. Override to A/B the staged YOLOv8s swap without editing anything
-# (see models/YOLOV8S_SWAP.md):
+# (see object_detection/YOLOV8S_SWAP.md):
 #   TB4_OAKD_MODEL=yolov8s_416_fixed_6shave bash run_oakd.sh
-DEFAULT_MODEL_FILE = "models/DEFAULT_MODEL"
+DEFAULT_MODEL_FILE = "object_detection/DEFAULT_MODEL"
 
 
 def workspace():
@@ -52,15 +52,15 @@ def write_nn_config():
     `TB4_ROOT` portability every launch script otherwise honours: any clone
     elsewhere pointed depthai at a blob that did not exist.
 
-    Now one committed `models/nn_base.json` holds the shared `nn_config` +
+    Now one committed `object_detection/nn_base.json` holds the shared `nn_config` +
     label mappings, and the `model` block is injected here from wherever the
     blob actually is.
     """
     ws = workspace()
     model = default_model()
-    with open(os.path.join(ws, "models", "nn_base.json")) as f:
+    with open(os.path.join(ws, "object_detection", "nn_base.json")) as f:
         cfg = json.load(f)
-    blob = os.path.join(ws, "models", model + ".blob")
+    blob = os.path.join(ws, "object_detection", model + ".blob")
     cfg["model"] = {"zoo": "path", "model_name": blob}
     out = os.path.join(tempfile.gettempdir(), "tb4_nn_%s.json" % model)
     with open(out, "w") as f:

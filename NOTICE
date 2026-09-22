@@ -23,7 +23,7 @@ who cannot comply with AGPL-3.0.
 
 This affects two things here:
 
-  (a) The prebuilt model blobs fetched into `models/`:
+  (a) The prebuilt model blobs fetched into `object_detection/`:
 
           yolov5mu_416_5shave.blob      (from Ultralytics YOLOv5mu)
           yolov8s_416_fixed_6shave.blob (from Ultralytics YOLOv8s)
@@ -40,8 +40,8 @@ This affects two things here:
 
   (b) The training and export scripts that import `ultralytics`:
 
-          training/train.py, training/autolabel.py, training/export_for_oak.py
-          objdet18/train.py
+          object_detection/training/train.py, object_detection/training/autolabel.py, object_detection/training/export_for_oak.py
+          object_detection/training/run.sh
 
       Running these locally is ordinary use. Distributing a combined work built
       on them may pull you into AGPL-3.0 obligations.
@@ -60,7 +60,7 @@ detector from a permissively licensed architecture instead.
 
 2. Training datasets
 --------------------
-`objdet18/` and `training/` download public datasets that are NOT redistributed
+`object_detection/training/` download public datasets that are NOT redistributed
 here, and that carry their own terms:
 
   - COCO 2017 (https://cocodataset.org/#termsofuse) -- annotations are CC BY
@@ -85,7 +85,7 @@ Installed separately, listed for completeness:
 Summary
 -------
 Project code: MIT, use it freely.
-`models/*.blob`: not in this repo; fetched from a Release and derived from
+`object_detection/*.blob`: not in this repo; fetched from a Release and derived from
 AGPL-3.0 Ultralytics weights -- AGPL terms apply to them.
 Datasets: each has its own terms; none are redistributed here.
 

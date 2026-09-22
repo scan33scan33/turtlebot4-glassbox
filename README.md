@@ -140,7 +140,7 @@ to localhost only, change `app.run(host='0.0.0.0', ...)` to `host='127.0.0.1'`.
   (honors `TB4_HOST`, `TB4_BASE`, `TB4_ROOT`, `TB4_SUDO_PW` env vars — never
   committed; `run_oakd.sh` also honors `TB4_OAKD_MODEL` to pick the detector)
 - `services/` — systemd units: everything auto-starts on boot (+ ready chime)
-- `models/` — `nn_base.json` (the shared decode config: COCO-80 labels +
+- `object_detection/` — `nn_base.json` (the shared decode config: COCO-80 labels +
   thresholds) and `DEFAULT_MODEL` (which blob to launch). `oakd_rgbd.launch.py`
   combines the two at launch and writes the per-blob config to `/tmp`, so nothing
   committed carries an absolute path. The `.blob` files themselves are Release
@@ -157,7 +157,7 @@ to localhost only, change `app.run(host='0.0.0.0', ...)` to `host='127.0.0.1'`.
 - `fastdds_no_shm.xml` — Fast-DDS profile that disables shared-memory transport;
   this box's SHM is flaky and caused "rcl node's context is invalid" crashes.
   Every launch script exports it as `FASTRTPS_DEFAULT_PROFILES_FILE`.
-- `training/` and `objdet18/` — optional custom-detector training pipelines
+- `object_detection/training/` — optional custom-detector training pipelines
   (needs `ultralytics`; see the licensing note below)
 
 ## License
@@ -170,7 +170,7 @@ weights, which are **AGPL-3.0** (Ultralytics also sells a commercial Enterprise
 License). They are distributed as Release assets rather than committed here, so
 this repository's tree is MIT throughout — but the blobs you download are not,
 and neither is anything you build from them. The same applies to the
-`training/` and `objdet18/` scripts that import `ultralytics`. The navigator
+`object_detection/training/` scripts that import `ultralytics`. The navigator
 itself does not — inference runs on the OAK-D's VPU from a compiled blob —
 which is why `ultralytics` is not in the default `requirements.txt` install.
 
