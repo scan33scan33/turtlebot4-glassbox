@@ -36,11 +36,7 @@ into autonomous behaviors:
 | `push_ball_to_goal` | find the ball and push it to **the spot you marked**. Pick the goal, then run it. |
 | `push_ball_to_wall` | find a ball, centre it, push it to the wall (camera-only). No goal needed — **the field-proven default.** |
 | `push_to_wall` | same task with a lidar wall-goal + camera steering + lidar close-range ball tracking (camera+lidar fusion). Experimental. |
-| `follow_human` | follow the closest person at a safe 1 m standoff to help carry things — never drives into them. |
-| `follow` | follow anything you name from the COCO list (person, dog, cat, bottle, chair, cup, …). |
-| `follow_dog` | follow the closest dog at a safe distance. |
-| `follow_ball` | follow the ball at a safe distance *without* pushing it. |
-| `follow_ball_aggressive` | chase the ball hard, predicting where it went with the lidar when the camera loses it. |
+| `follow` | follow **anything** you name from the COCO list (person, dog, cat, ball, bottle, chair, cup, …), or just "follow me" / "help me carry" for the closest person. Routes around furniture and never drives into the target. Distance and technique adapt to what you named: a big target (person, dog) is followed at once from a 1 m standoff; a small low one (ball, bottle, cup) from 0.7 m, acquired with a step-and-stare sweep first — and say "…aggressively" / "track the ball" / "predict the ball" to also use the lidar + velocity predictor that bridges the camera's gaps. |
 | `open_explore` | roam toward the most open space, avoiding obstacles. |
 
 Trigger by phrase (e.g. "push the ball to the goal", "push the ball to the wall",
@@ -141,17 +137,23 @@ to localhost only, change `app.run(host='0.0.0.0', ...)` to `host='127.0.0.1'`.
 - `dataset_tools.py` — load / inspect / render recorded drives
 - `oakd_rgbd.launch.py` — OAK-D spatial-YOLO launch (custom; bypasses bringup)
 - `run_nav.sh` / `run_oakd.sh` — launch;  `chime.sh` — one-command recovery + chime
-  (honors `TB4_HOST`, `TB4_BASE`, `TB4_ROOT`, `TB4_SUDO_PW` env vars — never committed)
+  (honors `TB4_HOST`, `TB4_BASE`, `TB4_ROOT`, `TB4_SUDO_PW` env vars — never
+  committed; `run_oakd.sh` also honors `TB4_OAKD_MODEL` to pick the detector)
 - `services/` — systemd units: everything auto-starts on boot (+ ready chime)
-- `models/` — nn configs for the deployed OAK blobs. The `.blob` files
-  themselves are Release assets fetched by `scripts/download_models.sh`, not
-  committed; source `.pt` weights are gitignored (ultralytics re-downloads them)
+- `models/` — `nn_base.json` (the shared decode config: COCO-80 labels +
+  thresholds) and `DEFAULT_MODEL` (which blob to launch). `oakd_rgbd.launch.py`
+  combines the two at launch and writes the per-blob config to `/tmp`, so nothing
+  committed carries an absolute path. The `.blob` files themselves are Release
+  assets fetched by `scripts/download_models.sh`, not committed; source `.pt`
+  weights are gitignored (ultralytics re-downloads them)
 - `scripts/download_models.sh` — fetch + SHA-256 verify the OAK blobs
 - `docs/operations.md` — operational notes (`/cmd_vel` recovery, OAK gotchas)
-- `templates/index.html` — web UI source (extracted from `tb4_claude_nav.py:_HTML` for lintability)
-- `goal_cycle.py` / `goal_run.py` — standalone chime + drive-leg loop, driven off
-  nav's `/state` (a shuttle test used to validate `/cmd_vel` end-to-end; not
-  imported by the navigator)
+- `templates/index.html` — the web UI, served at `/` (kept out of the Python so
+  it is lintable; Flask resolves it relative to the module, so it works from any
+  cwd)
+- `devtools/` — operator scaffolding, **not** imported by anything: a standalone
+  chime + drive-leg loop driven off nav's `/state`, used to validate `/cmd_vel`
+  end-to-end. See `devtools/README.md`.
 - `fastdds_no_shm.xml` — Fast-DDS profile that disables shared-memory transport;
   this box's SHM is flaky and caused "rcl node's context is invalid" crashes.
   Every launch script exports it as `FASTRTPS_DEFAULT_PROFILES_FILE`.
