@@ -750,7 +750,7 @@ class NavNode(Node):
         """Relaunch the OAK driver (run_oakd.sh, detached) — recovers a frozen
         OAK-D Lite (USB2 stalls leave it publishing nothing). True if spawned."""
         try:
-            sh = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'run_oakd.sh')
+            sh = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.join('object_detection', 'run_oakd.sh'))
             subprocess.Popen(['bash', sh], stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
                              start_new_session=True)

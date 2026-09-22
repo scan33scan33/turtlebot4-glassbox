@@ -36,7 +36,7 @@ datasets/
 cam_frame.jpg
 
 # OAK-D YOLO blobs: NOT committed. They are published as GitHub Release assets
-# and fetched by scripts/download_models.sh — this keeps the clone small and
+# and fetched by object_detection/download_models.sh — this keeps the clone small and
 # avoids redistributing AGPL-3.0-derived Ultralytics weights from an MIT repo
 # (see NOTICE). The DEPLOYED blob is a
 # properly-preprocessed export: depthai-model-zoo blobs lack the /255 input scale

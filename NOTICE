@@ -33,7 +33,7 @@ This affects two things here:
       MIT-licensed files. The MIT LICENSE file does not apply to them.
 
       They are NOT committed to this repository. They are published as GitHub
-      Release assets and downloaded by `scripts/download_models.sh`, so the
+      Release assets and downloaded by `object_detection/download_models.sh`, so the
       repository tree itself is MIT throughout. Downloading a blob, running it,
       and building on it are still governed by Ultralytics' terms, not by this
       project's licence.

@@ -9,7 +9,7 @@ The `.blob` compiled weights are **not committed** to Git to keep clones lightwe
 ## Quickstart (fetch deployed blobs)
 
 ```bash
-bash scripts/download_models.sh
+bash object_detection/download_models.sh
 ```
 
 This downloads:
@@ -25,7 +25,7 @@ yolov5mu_416_5shave
 
 To run a different detector without changing Git files, pass `TB4_OAKD_MODEL`:
 ```bash
-TB4_OAKD_MODEL=yolov8s_416_fixed_6shave bash run_oakd.sh
+TB4_OAKD_MODEL=yolov8s_416_fixed_6shave bash object_detection/run_oakd.sh
 ```
 
 ## Config Generation at Launch

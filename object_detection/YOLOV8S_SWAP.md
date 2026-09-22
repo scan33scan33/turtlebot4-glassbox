@@ -15,12 +15,12 @@ Flipping is one environment variable; there is no source edit to make.
 ```bash
 cd ~/Workspace/turtlebot4-glassbox
 git pull                              # brings nn_base.json + DEFAULT_MODEL
-bash scripts/download_models.sh       # brings both blobs (Release assets, not committed)
+bash object_detection/download_models.sh       # brings both blobs (Release assets, not committed)
 ```
 Then run the OAK pipeline with the override — **no source edit, no line number
 to get wrong**:
 ```bash
-TB4_OAKD_MODEL=yolov8s_416_fixed_6shave bash run_oakd.sh
+TB4_OAKD_MODEL=yolov8s_416_fixed_6shave bash object_detection/run_oakd.sh
 ```
 Restart nav afterwards (`bash run_nav.sh`, or `sudo systemctl restart tb4-nav`).
 

@@ -20,11 +20,11 @@ export FASTRTPS_DEFAULT_PROFILES_FILE="$ROOT/fastdds_no_shm.xml"
 MODEL="${TB4_OAKD_MODEL:-$(cat "$ROOT/object_detection/DEFAULT_MODEL")}"
 if [ ! -f "$ROOT/object_detection/$MODEL.blob" ]; then
     echo "error: object_detection/$MODEL.blob is missing." >&2
-    echo "       Fetch the model blobs first:  bash scripts/download_models.sh" >&2
+    echo "       Fetch the model blobs first:  bash object_detection/download_models.sh" >&2
     exit 1
 fi
 # Clear any stale container so the USB handle is free (OAK needs ~12s to release).
 pkill -9 -f oakd_rgbd.launch 2>/dev/null || true
 pkill -9 -f component_container 2>/dev/null || true
 sleep 12
-exec ros2 launch "$ROOT/oakd_rgbd.launch.py"
+exec ros2 launch "$ROOT/object_detection/oakd_rgbd.launch.py"

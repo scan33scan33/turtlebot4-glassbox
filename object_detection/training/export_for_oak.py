@@ -30,7 +30,7 @@ That yields <best>.blob + an nn_config JSON. On the Pi:
   1. copy both next to your existing blobs (they're gitignored),
   2. point oakd_rgbd.launch.py's nn.i_nn_config_path at the new JSON,
   3. make sure the JSON's class list == data.yaml names, in the same order,
-  4. restart the OAK (run_oakd.sh) + nav.
+  4. restart the OAK (object_detection/run_oakd.sh) + nav.
 
 Then in tb4_claude_nav.py the detections just flow through as usual — your
 label strings become 'ball' / 'person' instead of COCO 'sports ball' / 'person'

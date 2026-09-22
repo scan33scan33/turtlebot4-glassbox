@@ -5,8 +5,8 @@
 # clone stays small and the repository does not redistribute AGPL-3.0-derived
 # Ultralytics weights under its own MIT licence (see NOTICE).
 #
-#   bash scripts/download_models.sh            # fetch what's missing
-#   bash scripts/download_models.sh --force    # re-fetch even if present
+#   bash object_detection/download_models.sh            # fetch what's missing
+#   bash object_detection/download_models.sh --force    # re-fetch even if present
 #
 # Overrides:
 #   TB4_MODELS_REPO=owner/name   # where the Release lives  (default below)
@@ -20,8 +20,7 @@ TAG=${TB4_MODELS_TAG:-models-v1}
 # Default to the checkout this script lives in, so it works from any cwd.
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ROOT=${TB4_ROOT:-$(dirname -- "$HERE")}
-DEST="$ROOT/object_detection"
-
+DEST="$HERE"
 FORCE=0
 [ "${1:-}" = "--force" ] && FORCE=1
 
@@ -89,7 +88,7 @@ if [ "$rc" -ne 0 ]; then
 One or more blobs could not be fetched. If you forked or renamed the repo, point
 this at your own Release:
 
-    TB4_MODELS_REPO=<owner>/<name> bash scripts/download_models.sh
+    TB4_MODELS_REPO=<owner>/<name> bash object_detection/download_models.sh
 
 You can also build the blobs yourself — see object_detection/README.md and
 object_detection/YOLOV8S_SWAP.md for the ultralytics + luxonis/tools export steps.
@@ -98,4 +97,4 @@ MSG
 fi
 
 echo
-echo "Models are in $DEST — you can now run run_oakd.sh."
+echo "Models are in $DEST — you can now run object_detection/run_oakd.sh."

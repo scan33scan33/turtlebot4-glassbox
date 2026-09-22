@@ -53,7 +53,7 @@ def twinkle():
 
 def recover():
     """Last-resort: full chime.sh recovery. Only when a stream is genuinely down."""
-    subprocess.run(["bash", os.path.join(ROOT, "chime.sh"), "--no-undock"],
+    subprocess.run(["bash", os.path.join(ROOT, "devtools", "chime.sh"), "--no-undock"],
                    cwd=ROOT, env={"TB4_SUDO_PW": os.environ.get("TB4_SUDO_PW", ""), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
                                   "HOME": os.path.expanduser("~")},
                    timeout=300, capture_output=True)
