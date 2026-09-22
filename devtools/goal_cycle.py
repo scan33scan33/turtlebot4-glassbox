@@ -13,8 +13,9 @@ Design notes (2026-08-20):
 import json, os, subprocess, sys, time, urllib.request
 
 NAV = os.environ.get("TB4_NAV", "http://127.0.0.1:5000")
-# Portable repo root — works regardless of where the repo is cloned
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# Portable repo root — works regardless of where the repo is cloned. This file
+# lives in devtools/, so the root is one level up (it is where chime.sh is).
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def state(timeout=6):
     with urllib.request.urlopen(NAV + "/state", timeout=timeout) as r:
