@@ -581,41 +581,98 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     2 · WHAT IS THIS / HOOK
+     2 · WHAT A VISITOR SEES
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="What is this?">
-  <div class="eyebrow"><span>The pitch</span><span class="rule"></span><span>two loops</span></div>
-  <h2>Build with Claude. Run as a <span class="accent">glass box</span>.</h2>
+  <div class="eyebrow"><span>The pitch</span><span class="rule"></span><span>what a visitor sees</span></div>
+  <h2>A command becomes a <span class="accent">visible plan</span>.</h2>
   <div class="body">
-    <div class="compare">
-      <div class="card">
-        <h3><span class="num">1</span> Build loop</h3>
-        <ul class="clean">
-          <li>Describe the behavior</li>
-          <li>Claude Code writes a candidate <span class="mono">.toy</span> script</li>
-          <li>Run it on the robot and collect a result</li>
-          <li>Feed that reward back into the next revision</li>
-        </ul>
+    <div class="loop">
+      <div class="loop-card">
+        <span class="pill see">1 · Ask</span>
+        <h3>Enter a command</h3>
+        <p><b>“Push the ball to the wall.”</b><br>No joystick — just the task in plain words.</p>
       </div>
-      <div class="card">
-        <h3><span class="num">2</span> Demo loop</h3>
-        <ul class="clean">
-          <li>Enter <b>“push the ball to the wall”</b></li>
-          <li>A tiny matcher selects the installed script</li>
-          <li>YOLO, geometry, A*, and pure pursuit execute it</li>
-          <li>The UI exposes the live map, path, and active skill</li>
-        </ul>
+      <div class="loop-arrow">→</div>
+      <div class="loop-card">
+        <span class="pill plan">2 · Select</span>
+        <h3>Load a readable script</h3>
+        <p>A tiny matcher chooses an installed <span class="mono">.toy</span> behavior.</p>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-card">
+        <span class="pill move">3 · Run</span>
+        <h3>Watch every decision</h3>
+        <p>The UI draws detections, map, path, and active skill while it drives.</p>
       </div>
     </div>
     <div class="callout">
-      <b>Claude is the VLA in our analogy:</b> language and test evidence go in;
-      a readable action program comes out.
+      Two stories follow: <b>how the script was made</b>, then how the robot executes it.
     </div>
   </div>
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     3 · MEET THE HARDWARE
+     3 · CLAUDE AS THE VLA — BY ANALOGY
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide" data-title="Prompt → script">
+  <div class="eyebrow"><span>How behaviors are made</span><span class="rule"></span><span>goal → script</span></div>
+  <h2>Claude is the <span class="accent">VLA</span> — by analogy.</h2>
+  <div class="body">
+    <p class="tagline" style="max-width:none;">
+      A VLA connects vision + language to actions. Here Claude Code works one level up:
+      a goal and evidence from a run become the next readable robot script.
+    </p>
+    <div class="evolution">
+      <div class="evo-card"><span class="evo-n">1</span><h3>Goal</h3><p>Describe the behavior and success condition.</p></div>
+      <div class="evo-arrow">→</div>
+      <div class="evo-card"><span class="evo-n">2</span><h3>Generate</h3><p>Claude writes or edits a candidate <span class="mono">.toy</span> script.</p></div>
+      <div class="evo-arrow">→</div>
+      <div class="evo-card"><span class="evo-n">3</span><h3>Test</h3><p>The physical robot executes it and records what happened.</p></div>
+      <div class="evo-arrow">→</div>
+      <div class="evo-card reward"><span class="evo-n">4</span><h3>Reward ↺</h3><p>Pass, fail, or score becomes feedback for the next candidate.</p></div>
+    </div>
+    <div class="callout">
+      <b>Generate → test → improve → repeat.</b> At showtime, the chosen script runs locally without Claude.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     4 · GLASS BOX
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide light" data-title="Glass box">
+  <div class="eyebrow"><span>Philosophy</span><span class="rule"></span><span>why “glassbox”?</span></div>
+  <h2>The generated program is <span class="accent">inspectable</span>.</h2>
+  <div class="body">
+    <p class="big-quote" style="color:var(--navy);">
+      Before a wheel turns, we can read the script. During a run, we can see the map,
+      path, detections, push line, and active skill.
+    </p>
+    <div class="compare">
+      <div class="card">
+        <h3>Opaque robot policy</h3>
+        <ul class="clean">
+          <li>Motor behavior is buried in learned weights</li>
+          <li>A bad run is hard to explain</li>
+          <li>Fixing it means more data or training</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>This robot</h3>
+        <ul class="clean">
+          <li>Claude proposes readable code</li>
+          <li>A* + geometry decide motion</li>
+          <li>A failed test becomes a specific script change</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">At runtime, the only neural net labels objects. It does not steer.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     5 · HARDWARE
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Hardware">
   <div class="eyebrow"><span>Anatomy</span><span class="rule"></span><span>four parts, one brain</span></div>
@@ -709,221 +766,7 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     4 · GLASS BOX IDEA
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide light" data-title="Glass box">
-  <div class="eyebrow"><span>Philosophy</span><span class="rule"></span><span>why “glassbox”?</span></div>
-  <h2>The generated program is <span class="accent">inspectable</span>.</h2>
-  <div class="body">
-    <p class="big-quote" style="color:var(--navy);">
-      Before a wheel turns, we can read the script. During a run, we can see the map,
-      path, detections, push line, and active skill.
-    </p>
-    <div class="compare">
-      <div class="card">
-        <h3>Opaque robot policy</h3>
-        <ul class="clean">
-          <li>Motor behavior is buried in learned weights</li>
-          <li>A bad run is hard to explain</li>
-          <li>Fixing it means more data or training</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>This robot</h3>
-        <ul class="clean">
-          <li>Claude proposes readable code</li>
-          <li>A* + geometry decide motion</li>
-          <li>A failed test becomes a specific script change</li>
-        </ul>
-      </div>
-    </div>
-    <div class="callout">At runtime, the only neural net labels objects. It does not steer.</div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     5 · SEE → PLAN → MOVE
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide light" data-title="The loop">
-  <div class="eyebrow"><span>Robot runtime</span><span class="rule"></span><span>no Claude call while driving</span></div>
-  <h2>See → Plan → <span class="accent">Move</span>.</h2>
-  <div class="body">
-    <div class="loop">
-      <div class="loop-card">
-        <span class="pill see">1 · See</span>
-        <h3>Name + locate</h3>
-        <p>YOLO labels objects. Stereo and lidar measure distance.</p>
-        <div class="detail">camera VPU · ~6 Hz · 80 labels</div>
-      </div>
-      <div class="loop-arrow">→</div>
-      <div class="loop-card">
-        <span class="pill plan">2 · Plan</span>
-        <h3>Map + route</h3>
-        <p>Lidar builds a cost grid. A* finds a safe path.</p>
-        <div class="detail">120×120 cells · replan 3 Hz</div>
-      </div>
-      <div class="loop-arrow">→</div>
-      <div class="loop-card">
-        <span class="pill move">3 · Move</span>
-        <h3>Follow the path</h3>
-        <p>Pure pursuit aims 0.5&nbsp;m ahead and reroutes when blocked.</p>
-        <div class="detail">local, deterministic, inspectable</div>
-      </div>
-    </div>
-    <div class="callout">Claude writes the recipe between trials. These algorithms cook it on the robot.</div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     6 · SEE: YOLO (ML for non-ML people)
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide" data-title="Vision">
-  <div class="eyebrow"><span>See</span><span class="rule"></span><span>the only neural net in the runtime</span></div>
-  <h2>Vision in one sentence.</h2>
-  <div class="body">
-    <p class="tagline" style="max-width:none;">
-      A <b>neural net</b> learns a pixels-to-label function from examples:
-      here it returns <b>“sports ball, 93% sure, right here.”</b>
-    </p>
-    <div class="compare">
-      <div class="card">
-        <h3><span class="num">?</span> What YOLO returns</h3>
-        <ul class="clean">
-          <li>An object label from 80 COCO classes</li>
-          <li>A bounding box in the image</li>
-          <li>A confidence score; we keep ≥ 0.3</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3><span class="num">!</span> Where it runs</h3>
-        <ul class="clean">
-          <li>On the OAK-D camera’s VPU</li>
-          <li>About 6 detections per second</li>
-          <li>Offline, leaving the Pi free to plan</li>
-        </ul>
-      </div>
-    </div>
-    <div class="callout">YOLO says <b>what and where</b>. It never says which way the wheels should turn.</div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     7 · DISTANCE / SENSOR FUSION
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide" data-title="Distance">
-  <div class="eyebrow"><span>See · depth</span><span class="rule"></span><span>simple sensor fusion</span></div>
-  <h2>Two sensors. <span class="accent">One fast line.</span></h2>
-  <div class="body">
-    <div class="steps">
-      <div class="step">
-        <div class="n">1</div>
-        <div><h4>Stereo depth</h4><p>Use the <b>25th percentile</b> inside the box, so the wall behind the ball does not win.</p></div>
-      </div>
-      <div class="step">
-        <div class="n">2</div>
-        <div><h4>Lidar at the same bearing</h4><p>Convert image position to an angle and read the laser range there.</p></div>
-      </div>
-      <div class="step">
-        <div class="n">3</div>
-        <div>
-          <h4>Simple sensor fusion</h4>
-          <div class="formula formula-lg">distance = <span class="hl">min</span>(stereo_p25, lidar_at_bearing)</div>
-        </div>
-      </div>
-    </div>
-    <div class="callout">One <span class="mono">min()</span> operation: <b>fast, deterministic, and easy to debug.</b></div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     8 · COST MAP
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide" data-title="Cost map">
-  <div class="eyebrow"><span>Plan · map</span><span class="rule"></span><span>where is it safe?</span></div>
-  <h2>No floor plan? <span class="accent">Draw one live.</span></h2>
-  <div class="body">
-    <p class="tagline" style="max-width:none;">
-      Each lidar sweep paints a <b>120×120 grid</b>: 5&nbsp;cm cells covering 6×6&nbsp;m around the robot.
-    </p>
-    <div class="compare">
-      <div class="formula formula-lg">
-<pre style="background:transparent;padding:0;margin:0;border:none;">         ⎧  ∞                    d ≤ 0.18 m
-cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &lt; 0.30
-         ⎩  0                    d ≥ 0.30 m</pre>
-      </div>
-      <div class="card">
-        <h3>Three kinds of cell</h3>
-        <ul class="clean">
-          <li><b>Blocked</b> — inside the robot radius</li>
-          <li><b>Expensive</b> — legal, but too close to a wall</li>
-          <li><b>Free</b> — open floor</li>
-        </ul>
-      </div>
-    </div>
-    <div class="callout">The soft-cost band breaks ties: the route with more clearance wins.</div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     9 · A*  (they know basic algorithms)
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide" data-title="A*">
-  <div class="eyebrow"><span>Plan · pathfinding</span><span class="rule"></span><span>watch it search</span></div>
-  <h2>A* is the same trick used by a <span class="accent">game character</span>.</h2>
-  <div class="body">
-    <div class="astar-stage">
-      <canvas id="astarCanvas" aria-label="Animated A-star search: a pixel robot explores a game map, finds a route around walls, and walks to the goal">Animated A* game-map search.</canvas>
-      <div class="astar-legend" aria-hidden="true">
-        <span><i class="legend-swatch searched"></i> searched</span>
-        <span><i class="legend-swatch route"></i> best route</span>
-      </div>
-      <button class="replay" id="astarReplay" type="button" aria-label="Replay the A-star animation">↻ replay</button>
-    </div>
-    <div class="callout"><b>Search promising tiles → keep the best route.</b> The robot does the same thing on its live lidar map.</div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     10 · PURE PURSUIT
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide light" data-title="Pure pursuit">
-  <div class="eyebrow"><span>Move · pure pursuit</span><span class="rule"></span><span>the carrot idea</span></div>
-  <h2>Put a virtual carrot on the path. Move it <span class="accent">forward</span>.</h2>
-  <div class="body">
-    <p class="tagline" style="max-width:none;">
-      The “carrot” is a point in software, always <b>0.5&nbsp;m ahead</b> on the safe route.
-    </p>
-    <div class="row" style="flex:1;">
-      <div class="steps" style="flex:1;">
-        <div class="step"><div class="n">1</div><div><h4>A* draws the safe line</h4><p>The line bends around walls.</p></div></div>
-        <div class="step"><div class="n">2</div><div><h4>Place a carrot on it</h4><p>Pick a point 0.5&nbsp;m ahead on the route.</p></div></div>
-        <div class="step"><div class="n">3</div><div><h4>Chase it</h4><p>Steer toward it; as the robot moves, it slides forward.</p></div></div>
-      </div>
-      <div class="card pursuit-card">
-        <h3>Why not aim at the final goal?</h3>
-        <div class="fig pursuit-fig">
-          <svg viewBox="0 0 420 240" preserveAspectRatio="xMidYMid meet" aria-label="The direct line to a goal cuts through a wall, while pure pursuit follows a safe curved path via a lookahead carrot">
-            <line x1="55" y1="190" x2="365" y2="45" stroke="#E23A2E" stroke-width="3" stroke-dasharray="8 7" opacity=".7"/>
-            <text x="265" y="108" font-size="14" font-weight="700" fill="#E23A2E">cuts the corner</text>
-            <rect x="190" y="74" width="64" height="112" rx="5" fill="#7E93BC" stroke="#14213D" stroke-width="3"/>
-            <path d="M55 190 C 105 206, 145 206, 175 200 S 285 205, 315 120 S 345 65, 365 45" fill="none" stroke="#14213D" stroke-width="5" stroke-dasharray="10 7"/>
-            <g transform="translate(55 190)"><rect x="-17" y="-12" width="34" height="24" rx="5" fill="#E23A2E"/><circle cx="-10" cy="13" r="6" fill="#14213D"/><circle cx="10" cy="13" r="6" fill="#14213D"/></g>
-            <text x="55" y="164" text-anchor="middle" font-size="15" font-weight="700" fill="#14213D">robot</text>
-            <circle cx="155" cy="203" r="13" fill="#FFB627" stroke="#14213D" stroke-width="3"/>
-            <text x="155" y="229" text-anchor="middle" font-size="15" font-weight="700" fill="#14213D">moving carrot</text>
-            <rect x="353" y="33" width="24" height="24" rx="3" fill="#1B9AAA" stroke="#14213D" stroke-width="3"/>
-            <text x="365" y="24" text-anchor="middle" font-size="15" font-weight="700" fill="#14213D">final goal</text>
-            <text x="222" y="135" text-anchor="middle" font-size="15" font-weight="700" fill="#F7F1E1">wall</text>
-          </svg>
-        </div>
-        <p>The final goal may be around a corner. The carrot is always <b>on the safe path</b>.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     11 · BEHAVIORS / TOY DSL
+     6 · BEHAVIORS / TOY DSL
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Behaviors">
   <div class="eyebrow"><span>Skills</span><span class="rule"></span><span>a tiny action language</span></div>
@@ -969,7 +812,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     12 · NL → PROGRAM
+     7 · COMMAND → INSTALLED SCRIPT
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Language match">
   <div class="eyebrow"><span>Showtime</span><span class="rule"></span><span>command → installed script</span></div>
@@ -993,39 +836,193 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
       <span class="chip">→ follow_dog.toy</span>
       <span class="chip">→ FOLLOW("dog")</span>
     </div>
-    <div class="callout">Claude evolves the library between trials; this ~50-line rule selects from it during the demo.</div>
+    <div class="callout">The matcher only selects a script. It does not steer, plan, or invent a new behavior at showtime.</div>
   </div>
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     13 · CLAUDE AS THE VLA (ANALOGY)
+     8 · SEE → PLAN → MOVE
      ═══════════════════════════════════════════════════════════ -->
-<section class="slide" data-title="Prompt → script">
-  <div class="eyebrow"><span>The analogy</span><span class="rule"></span><span>language → action program</span></div>
-  <h2>Claude is the <span class="accent">VLA</span> — by analogy.</h2>
+<section class="slide light" data-title="The loop">
+  <div class="eyebrow"><span>Robot runtime</span><span class="rule"></span><span>installed script executing</span></div>
+  <h2>See → Plan → <span class="accent">Move</span>.</h2>
+  <div class="body">
+    <div class="loop">
+      <div class="loop-card">
+        <span class="pill see">1 · See</span>
+        <h3>Name + locate</h3>
+        <p>YOLO labels objects. Stereo and lidar measure distance.</p>
+        <div class="detail">camera VPU · ~6 Hz · 80 labels</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-card">
+        <span class="pill plan">2 · Plan</span>
+        <h3>Map + route</h3>
+        <p>Lidar builds a cost grid. A* finds a safe path.</p>
+        <div class="detail">120×120 cells · replan 3 Hz</div>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-card">
+        <span class="pill move">3 · Move</span>
+        <h3>Follow the path</h3>
+        <p>Pure pursuit aims 0.5&nbsp;m ahead and reroutes when blocked.</p>
+        <div class="detail">local, deterministic, inspectable</div>
+      </div>
+    </div>
+    <div class="callout">The script chooses the skill. <b>See → Plan → Move</b> handles each moment.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     9 · VISION
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide" data-title="Vision">
+  <div class="eyebrow"><span>See</span><span class="rule"></span><span>the only neural net in the runtime</span></div>
+  <h2>Vision in one sentence.</h2>
   <div class="body">
     <p class="tagline" style="max-width:none;">
-      A VLA connects vision + language to actions. Here Claude Code works one level up:
-      a goal and evidence from a run become the next readable robot script.
+      A <b>neural net</b> learns a pixels-to-label function from examples:
+      here it returns <b>“sports ball, 93% sure, right here.”</b>
     </p>
-    <div class="evolution">
-      <div class="evo-card"><span class="evo-n">1</span><h3>Goal</h3><p>Describe the behavior and success condition.</p></div>
-      <div class="evo-arrow">→</div>
-      <div class="evo-card"><span class="evo-n">2</span><h3>Generate</h3><p>Claude writes or edits a candidate <span class="mono">.toy</span> script.</p></div>
-      <div class="evo-arrow">→</div>
-      <div class="evo-card"><span class="evo-n">3</span><h3>Test</h3><p>The physical robot executes it and records what happened.</p></div>
-      <div class="evo-arrow">→</div>
-      <div class="evo-card reward"><span class="evo-n">4</span><h3>Reward ↺</h3><p>Pass, fail, or score becomes feedback for the next candidate.</p></div>
+    <div class="compare">
+      <div class="card">
+        <h3><span class="num">?</span> What YOLO returns</h3>
+        <ul class="clean">
+          <li>An object label from 80 COCO classes</li>
+          <li>A bounding box in the image</li>
+          <li>A confidence score; we keep ≥ 0.3</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="num">!</span> Where it runs</h3>
+        <ul class="clean">
+          <li>On the OAK-D camera’s VPU</li>
+          <li>About 6 detections per second</li>
+          <li>Offline, leaving the Pi free to plan</li>
+        </ul>
+      </div>
     </div>
-    <div class="callout">
-      <b>Evolutionary loop:</b> generate → test → select or improve → repeat.
-      At showtime Claude is out of the loop; the chosen script runs locally.
+    <div class="callout">YOLO says <b>what and where</b>. It never says which way the wheels should turn.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     10 · SIMPLE SENSOR FUSION
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide" data-title="Distance">
+  <div class="eyebrow"><span>See · depth</span><span class="rule"></span><span>simple sensor fusion</span></div>
+  <h2>Two sensors. <span class="accent">One fast line.</span></h2>
+  <div class="body">
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <div><h4>Stereo depth</h4><p>Use the <b>25th percentile</b> inside the box, so the wall behind the ball does not win.</p></div>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <div><h4>Lidar at the same bearing</h4><p>Convert image position to an angle and read the laser range there.</p></div>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <div>
+          <h4>Simple sensor fusion</h4>
+          <div class="formula formula-lg">distance = <span class="hl">min</span>(stereo_p25, lidar_at_bearing)</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout">One <span class="mono">min()</span> operation: <b>fast, deterministic, and easy to debug.</b></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     11 · COST MAP
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide" data-title="Cost map">
+  <div class="eyebrow"><span>Plan · map</span><span class="rule"></span><span>where is it safe?</span></div>
+  <h2>No floor plan? <span class="accent">Draw one live.</span></h2>
+  <div class="body">
+    <p class="tagline" style="max-width:none;">
+      Each lidar sweep paints a <b>120×120 grid</b>: 5&nbsp;cm cells covering 6×6&nbsp;m around the robot.
+    </p>
+    <div class="compare">
+      <div class="formula formula-lg">
+<pre style="background:transparent;padding:0;margin:0;border:none;">         ⎧  ∞                    d ≤ 0.18 m
+cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &lt; 0.30
+         ⎩  0                    d ≥ 0.30 m</pre>
+      </div>
+      <div class="card">
+        <h3>Three kinds of cell</h3>
+        <ul class="clean">
+          <li><b>Blocked</b> — inside the robot radius</li>
+          <li><b>Expensive</b> — legal, but too close to a wall</li>
+          <li><b>Free</b> — open floor</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">The soft-cost band breaks ties: the route with more clearance wins.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     12 · A* GAME ANIMATION
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide" data-title="A*">
+  <div class="eyebrow"><span>Plan · pathfinding</span><span class="rule"></span><span>watch it search</span></div>
+  <h2>A* is the same trick used by a <span class="accent">game character</span>.</h2>
+  <div class="body">
+    <div class="astar-stage">
+      <canvas id="astarCanvas" aria-label="Animated A-star search: a pixel robot explores a game map, finds a route around walls, and walks to the goal">Animated A* game-map search.</canvas>
+      <div class="astar-legend" aria-hidden="true">
+        <span><i class="legend-swatch searched"></i> searched</span>
+        <span><i class="legend-swatch route"></i> best route</span>
+      </div>
+      <button class="replay" id="astarReplay" type="button" aria-label="Replay the A-star animation">↻ replay</button>
+    </div>
+    <div class="callout"><b>Search promising tiles → keep the best route.</b> The robot does the same thing on its live lidar map.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     13 · PURE PURSUIT
+     ═══════════════════════════════════════════════════════════ -->
+<section class="slide light" data-title="Pure pursuit">
+  <div class="eyebrow"><span>Move · pure pursuit</span><span class="rule"></span><span>the carrot idea</span></div>
+  <h2>Put a virtual carrot on the path. Move it <span class="accent">forward</span>.</h2>
+  <div class="body">
+    <p class="tagline" style="max-width:none;">
+      The “carrot” is a point in software, always <b>0.5&nbsp;m ahead</b> on the safe route.
+    </p>
+    <div class="row" style="flex:1;">
+      <div class="steps" style="flex:1;">
+        <div class="step"><div class="n">1</div><div><h4>A* draws the safe line</h4><p>The line bends around walls.</p></div></div>
+        <div class="step"><div class="n">2</div><div><h4>Place a carrot on it</h4><p>Pick a point 0.5&nbsp;m ahead on the route.</p></div></div>
+        <div class="step"><div class="n">3</div><div><h4>Chase it</h4><p>Steer toward it; as the robot moves, it slides forward.</p></div></div>
+      </div>
+      <div class="card pursuit-card">
+        <h3>Why not aim at the final goal?</h3>
+        <div class="fig pursuit-fig">
+          <svg viewBox="0 0 420 240" preserveAspectRatio="xMidYMid meet" aria-label="The direct line to a goal cuts through a wall, while pure pursuit follows a safe curved path via a lookahead carrot">
+            <line x1="55" y1="190" x2="365" y2="45" stroke="#E23A2E" stroke-width="3" stroke-dasharray="8 7" opacity=".7"/>
+            <text x="265" y="108" font-size="14" font-weight="700" fill="#E23A2E">cuts the corner</text>
+            <rect x="190" y="74" width="64" height="112" rx="5" fill="#7E93BC" stroke="#14213D" stroke-width="3"/>
+            <path d="M55 190 C 105 206, 145 206, 175 200 S 285 205, 315 120 S 345 65, 365 45" fill="none" stroke="#14213D" stroke-width="5" stroke-dasharray="10 7"/>
+            <g transform="translate(55 190)"><rect x="-17" y="-12" width="34" height="24" rx="5" fill="#E23A2E"/><circle cx="-10" cy="13" r="6" fill="#14213D"/><circle cx="10" cy="13" r="6" fill="#14213D"/></g>
+            <text x="55" y="164" text-anchor="middle" font-size="15" font-weight="700" fill="#14213D">robot</text>
+            <circle cx="155" cy="203" r="13" fill="#FFB627" stroke="#14213D" stroke-width="3"/>
+            <text x="155" y="229" text-anchor="middle" font-size="15" font-weight="700" fill="#14213D">moving carrot</text>
+            <rect x="353" y="33" width="24" height="24" rx="3" fill="#1B9AAA" stroke="#14213D" stroke-width="3"/>
+            <text x="365" y="24" text-anchor="middle" font-size="15" font-weight="700" fill="#14213D">final goal</text>
+            <text x="222" y="135" text-anchor="middle" font-size="15" font-weight="700" fill="#F7F1E1">wall</text>
+          </svg>
+        </div>
+        <p>The final goal may be around a corner. The carrot is always <b>on the safe path</b>.</p>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     14 · DEMO: PUSH BALL
+     14 · PUSH DEMO EXPLAINED
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide light" data-title="Push the ball">
   <div class="eyebrow"><span>Demo explained</span><span class="rule"></span><span>stop · look · push</span></div>
@@ -1066,7 +1063,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     15 · MORE DEMOS
+     15 · DEMO MENU
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="More demos">
   <div class="eyebrow"><span>Demo menu</span><span class="rule"></span><span>try these at the booth</span></div>
@@ -1093,8 +1090,8 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
   <div class="body">
     <div class="hack-grid">
       <div class="hack-card">
-        <h3>Use p25 depth</h3>
-        <p><b>Why:</b> wall pixels pollute the ball’s box.<br><b>Fix:</b> p25 favors the nearer object.</p>
+        <h3>Ignore one noisy alarm</h3>
+        <p><b>Why:</b> <span class="mono">backup_limit</span> false-triggers near the dock.<br><b>Fix:</b> ignore it; bump, cliff, and wheel-drop still stop.</p>
       </div>
       <div class="hack-card">
         <h3>Objects become no-go disks</h3>
@@ -1109,8 +1106,8 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
         <p><b>Why:</b> conversion can change model output.<br><b>Fix:</b> test the <span class="mono">.blob</span> on the VPU.</p>
       </div>
       <div class="hack-card router-card">
-        <h3>Yes, the router is part of the robot</h3>
-        <p><b>Why:</b> the bot did not work with my home mesh.<br><b>Fix:</b> Micro Center → dedicated <b>ASUS router</b>.</p>
+        <h3>The router is part of the robot</h3>
+        <p><b>Why:</b> the bot failed on my home mesh.<br><b>Fix:</b> Micro Center → dedicated <b>ASUS router</b>.</p>
       </div>
     </div>
   </div>

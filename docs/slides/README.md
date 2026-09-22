@@ -19,21 +19,21 @@ It deliberately does **not** assume ROS, depth cameras, or deep-learning math.
 | # | slide | point |
 |---|---|---|
 | 1 | Title | Claude generates scripts; the robot evaluates and runs them |
-| 2 | The pitch | Build/evaluate loop vs. local demo/runtime loop |
-| 3 | Hardware | OAK-D · RPLIDAR · Pi 4 · Create 3 |
+| 2 | Visitor experience | Command → installed script → visible execution |
+| 3 | VLA analogy | Claude: goal + run evidence → next candidate script |
 | 4 | Glass box | Generated code is readable; runtime decisions are visible |
-| 5 | See → Plan → Move | The local runtime loop — no Claude call while driving |
-| 6 | Vision | YOLO in one sentence; why it runs on the camera chip |
-| 7 | Distance | Simple, fast fusion: p25 stereo + lidar@bearing → `min(...)` |
-| 8 | Cost map | Live 120×120 grid, soft exponential inflation |
-| 9 | A* | Animated game map: search wave → best route → moving sprite |
-| 10 | Pure pursuit | Intuitive moving-carrot explanation: stay on the safe path |
-| 11 | `.toy` DSL | Claude composes bounded skills; `0.40` means one 40 cm push segment |
-| 12 | Runtime match | Verbatim trigger, else token-overlap score |
-| 13 | VLA analogy | Claude: goal + run evidence → next candidate script |
-| 14 | Push the ball | Stop–look–push, with a diagram and the reason for short segments |
+| 5 | Hardware | OAK-D · RPLIDAR · Pi 4 · Create 3 |
+| 6 | `.toy` DSL | The readable artifact Claude writes; `0.40` = one 40 cm push |
+| 7 | Runtime match | Verbatim trigger, else token-overlap score |
+| 8 | See → Plan → Move | The installed script selects a skill; local algorithms execute it |
+| 9 | Vision | YOLO names and boxes objects; it does not steer |
+| 10 | Sensor fusion | p25 stereo + lidar@bearing → one fast `min(...)` |
+| 11 | Cost map | Live 120×120 grid with a soft clearance band |
+| 12 | A* | Animated game map: search wave → best route → moving sprite |
+| 13 | Pure pursuit | A virtual moving carrot keeps motion on the safe path |
+| 14 | Push the ball | Stop–look–push, with a diagram and short-segment rationale |
 | 15 | Demo menu | Wall push · follow me · push to a marked goal |
-| 16 | Field hacks | Five problem→reason→fix stories, including the ASUS router run |
+| 16 | Field hacks | Five distinct problem→reason→fix stories, including the ASUS router |
 | 17 | Open source | Repo, Claude Code + Arena.Ai credit, and come say hi |
 
 The generate → physical test → reward → revision story reflects the project’s
