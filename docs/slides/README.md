@@ -1,6 +1,7 @@
 # Maker Faire slideshow
 
-A self-contained HTML deck for booth talks and short walk-throughs.
+A self-contained HTML deck for booth talks and short walk-throughs. The stack
+was built with Claude Code on [Arena.Ai](https://arena.ai).
 
 | file | what |
 |---|---|
@@ -26,14 +27,14 @@ It deliberately does **not** assume ROS, depth cameras, or deep-learning math.
 | 7 | Distance | Simple, fast fusion: p25 stereo + lidar@bearing → `min(...)` |
 | 8 | Cost map | Live 120×120 grid, soft exponential inflation |
 | 9 | A* | Animated game map: search wave → best route → moving sprite |
-| 10 | Pure pursuit | 0.5 m carrot — why driving looks smooth |
-| 11 | `.toy` DSL | Claude composes bounded skills into readable scripts |
+| 10 | Pure pursuit | Intuitive moving-carrot explanation: stay on the safe path |
+| 11 | `.toy` DSL | Claude composes bounded skills; `0.40` means one 40 cm push segment |
 | 12 | Runtime match | Verbatim trigger, else token-overlap score |
 | 13 | VLA analogy | Claude: goal + run evidence → next candidate script |
-| 14 | Push the ball | Physical test failures become concrete script improvements |
-| 15 | Demo menu | Three commands to try + “3 green dots = go” |
-| 16 | Evaluation fixes | Four lessons preserved from failed real runs |
-| 17 | Open source | Repo link and come say hi |
+| 14 | Push the ball | Stop–look–push, with a diagram and the reason for short segments |
+| 15 | Demo menu | Wall push · follow me · push to a marked goal |
+| 16 | Field hacks | Five problem→reason→fix stories, including the ASUS router run |
+| 17 | Open source | Repo, Claude Code + Arena.Ai credit, and come say hi |
 
 The generate → physical test → reward → revision story reflects the project’s
 actual development workflow. Every runtime constant, trigger phrase and eval
