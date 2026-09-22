@@ -415,6 +415,36 @@
   .end-chips { margin-top: 1rem; }
   .end-cta { margin-top: 1rem; }
 
+  /* ── animated A* game board ─────────────────────────────── */
+  .astar-stage {
+    position: relative; flex: 1; min-height: 300px; overflow: hidden;
+    background: #0F1830; border: 3px solid var(--navy3); border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.24);
+  }
+  #astarCanvas {
+    display: block; width: 100%; height: 100%;
+    image-rendering: pixelated;
+  }
+  .astar-legend {
+    position: absolute; left: 1rem; top: 1rem;
+    display: flex; gap: 1rem; align-items: center;
+    padding: .45rem .7rem; border-radius: 8px;
+    background: rgba(15,24,48,.88); border: 1px solid var(--navy3);
+    color: var(--ink); font-size: clamp(.85rem, 1.8vh, 1rem); font-weight: 700;
+  }
+  .astar-legend span { display: flex; align-items: center; gap: .4rem; }
+  .legend-swatch { width: .9rem; height: .9rem; display: inline-block; border-radius: 2px; }
+  .legend-swatch.searched { background: rgba(255,182,39,.72); }
+  .legend-swatch.route { background: #5CE1E6; }
+  .replay {
+    position: absolute; right: 1rem; top: 1rem;
+    border: 1.5px solid var(--navy3); border-radius: 8px;
+    background: rgba(20,33,61,.92); color: var(--cream);
+    padding: .45rem .75rem; cursor: pointer;
+    font: 700 clamp(.85rem, 1.8vh, 1rem) var(--mono);
+  }
+  .replay:hover, .replay:focus-visible { border-color: var(--amber); color: var(--amber); }
+
   /* ── agent ↔ robot evaluation loop ─────────────────────── */
   .evolution {
     display: grid;
@@ -745,8 +775,8 @@
      7 · DISTANCE / SENSOR FUSION
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Distance">
-  <div class="eyebrow"><span>See · depth</span><span class="rule"></span><span>how far is the ball?</span></div>
-  <h2>Two eyes + a laser = <span class="accent">one distance</span>.</h2>
+  <div class="eyebrow"><span>See · depth</span><span class="rule"></span><span>simple sensor fusion</span></div>
+  <h2>Two sensors. <span class="accent">One fast line.</span></h2>
   <div class="body">
     <div class="steps">
       <div class="step">
@@ -760,12 +790,12 @@
       <div class="step">
         <div class="n">3</div>
         <div>
-          <h4>Keep the nearer reading</h4>
+          <h4>Simple sensor fusion</h4>
           <div class="formula formula-lg">distance = <span class="hl">min</span>(stereo_p25, lidar_at_bearing)</div>
         </div>
       </div>
     </div>
-    <div class="callout">Camera says <b>what</b>. The nearer sensor says <b>where</b>.</div>
+    <div class="callout">One <span class="mono">min()</span> operation: <b>fast, deterministic, and easy to debug.</b></div>
   </div>
 </section>
 
@@ -802,33 +832,18 @@ cost(d) = ⎨  1.5·e<span class="hl">^(−8·(d−0.18))</span>  0.18 &lt; d &l
      9 · A*  (they know basic algorithms)
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="A*">
-  <div class="eyebrow"><span>Plan · pathfinding</span><span class="rule"></span><span>the algorithm you already know</span></div>
-  <h2>A* on a map that changes <span class="accent">live</span>.</h2>
+  <div class="eyebrow"><span>Plan · pathfinding</span><span class="rule"></span><span>watch it search</span></div>
+  <h2>A* is the same trick used by a <span class="accent">game character</span>.</h2>
   <div class="body">
-    <div class="row" style="flex:1;">
-      <div class="col" style="flex:1.15;">
-        <p class="tagline"><b>f = g + h</b>, with obstacle cost added to <b>g</b>.</p>
-<pre class="code-lg"><span class="kw">while</span> open_set:
-    cell = <span class="fn">pop_lowest_f</span>()
-    <span class="kw">for</span> neighbor, step <span class="kw">in</span> eight_moves:
-        g2 = g[cell] + step + <span class="hl">cost[neighbor]</span>
-        <span class="kw">if</span> g2 &lt; g[neighbor]:
-            g[neighbor] = g2
-            <span class="fn">push</span>(neighbor, g2 + h(neighbor))</pre>
+    <div class="astar-stage">
+      <canvas id="astarCanvas" aria-label="Animated A-star search: a pixel robot explores a game map, finds a route around walls, and walks to the goal">Animated A* game-map search.</canvas>
+      <div class="astar-legend" aria-hidden="true">
+        <span><i class="legend-swatch searched"></i> searched</span>
+        <span><i class="legend-swatch route"></i> best route</span>
       </div>
-      <div class="card" style="flex:.85;">
-        <h3>Robot-specific details</h3>
-        <ul class="clean">
-          <li><b>8-connected</b> grid</li>
-          <li><b>Euclidean</b> distance for h</li>
-          <li><b>Soft wall cost</b> folded into g</li>
-          <li>Replans <b>3 times a second</b></li>
-          <li>Line-of-sight pass smooths corners</li>
-        </ul>
-        <div class="src">astar() · about 35 lines</div>
-      </div>
+      <button class="replay" id="astarReplay" type="button" aria-label="Replay the A-star animation">↻ replay</button>
     </div>
-    <div class="callout">It is game pathfinding — except the board is redrawn from lidar while the robot moves.</div>
+    <div class="callout"><b>Search promising tiles → keep the best route.</b> The robot does the same thing on its live lidar map.</div>
   </div>
 </section>
 
@@ -1030,24 +1045,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
 </section>
 
 <!-- ═══════════════════════════════════════════════════════════
-     17 · TAKEAWAYS
-     ═══════════════════════════════════════════════════════════ -->
-<section class="slide light" data-title="Takeaways">
-  <div class="eyebrow"><span>Takeaways</span><span class="rule"></span><span>the pattern</span></div>
-  <h2>Use AI to build a robot you can still <span class="accent">debug</span>.</h2>
-  <div class="body">
-    <div class="compare fixes">
-      <div class="card"><h3>1 · Generate programs</h3><p>Ask Claude for inspectable scripts, not hidden motor behavior.</p></div>
-      <div class="card"><h3>2 · Bound the actions</h3><p>Give it a small DSL of tested robot skills.</p></div>
-      <div class="card"><h3>3 · Test physically</h3><p>Return a clear reward plus logs and visual evidence.</p></div>
-      <div class="card"><h3>4 · Keep runtime classical</h3><p>YOLO labels; geometry, A*, and pure pursuit decide motion.</p></div>
-    </div>
-    <div class="callout"><b>Generate → test → improve.</b> Keep every candidate readable.</div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════
-     18 · OPEN SOURCE / END
+     17 · OPEN SOURCE / END
      ═══════════════════════════════════════════════════════════ -->
 <section class="slide" data-title="Open source">
   <div class="eyebrow"><span>Open source</span><span class="rule"></span><span>go build one</span></div>
@@ -1095,6 +1093,10 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
     dotsBox.appendChild(b);
   });
   const dots = Array.from(dotsBox.children);
+  const aStarDemo = createAStarDemo(
+    document.getElementById('astarCanvas'),
+    document.getElementById('astarReplay')
+  );
 
   function go(n) {
     if (n < 0 || n >= slides.length) return;
@@ -1103,6 +1105,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
     i = n;
     slides[i].classList.add('on');
     dots[i].classList.add('on');
+    aStarDemo.setActive(slides[i].dataset.title === 'A*');
     counter.textContent = (i + 1) + ' / ' + slides.length;
     // keep active dot visible if many
     dots[i].scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -1115,7 +1118,7 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
   // keyboard
   document.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
     switch (e.key) {
       case 'ArrowRight': case 'PageDown': case ' ': case 'Enter':
         e.preventDefault(); next(); break;
@@ -1153,6 +1156,257 @@ SET ball = <span class="fn">SCAN_FOR</span>(<span class="str">"ball"</span>, 360
     if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
     tx = null;
   }, { passive: true });
+
+  /* A real A* search, rendered as a looping pixel-game example. */
+  function createAStarDemo(canvas, replayButton) {
+    if (!canvas) return { setActive() {} };
+
+    const ctx = canvas.getContext('2d');
+    const COLS = 20;
+    const ROWS = 10;
+    const start = { x: 1, y: 8 };
+    const goal = { x: 18, y: 1 };
+    const key = (x, y) => x + ',' + y;
+    const parseKey = (s) => {
+      const parts = s.split(',').map(Number);
+      return { x: parts[0], y: parts[1] };
+    };
+
+    // Three walls with gaps make the route zig-zag like a small game level.
+    const walls = new Set();
+    for (let y = 0; y <= 8; y++) if (y !== 6) walls.add(key(5, y));
+    for (let y = 1; y < ROWS; y++) if (y !== 3) walls.add(key(10, y));
+    for (let y = 0; y <= 7; y++) if (y !== 2) walls.add(key(15, y));
+
+    function solve() {
+      const h = (x, y) => Math.hypot(goal.x - x, goal.y - y);
+      const open = [{ ...start, g: 0, h: h(start.x, start.y) }];
+      const best = new Map([[key(start.x, start.y), 0]]);
+      const parent = new Map();
+      const closed = new Set();
+      const visited = [];
+
+      while (open.length) {
+        open.sort((a, b) => (a.g + a.h) - (b.g + b.h) || a.h - b.h);
+        const cur = open.shift();
+        const ck = key(cur.x, cur.y);
+        if (closed.has(ck)) continue;
+        closed.add(ck);
+        visited.push({ x: cur.x, y: cur.y });
+        if (cur.x === goal.x && cur.y === goal.y) break;
+
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const nx = cur.x + dx;
+            const ny = cur.y + dy;
+            const nk = key(nx, ny);
+            if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || walls.has(nk)) continue;
+            // A diagonal may not squeeze through the corner of a wall.
+            if (dx && dy && (walls.has(key(cur.x + dx, cur.y)) || walls.has(key(cur.x, cur.y + dy)))) continue;
+            const g = cur.g + (dx && dy ? Math.SQRT2 : 1);
+            if (g >= (best.get(nk) ?? Infinity)) continue;
+            best.set(nk, g);
+            parent.set(nk, ck);
+            open.push({ x: nx, y: ny, g, h: h(nx, ny) });
+          }
+        }
+      }
+
+      const path = [];
+      let cursor = key(goal.x, goal.y);
+      while (cursor) {
+        path.push(parseKey(cursor));
+        if (cursor === key(start.x, start.y)) break;
+        cursor = parent.get(cursor);
+      }
+      path.reverse();
+      return { visited, path };
+    }
+
+    const search = solve();
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    let active = false;
+    let frameId = 0;
+    let startedAt = 0;
+    let cssW = 0;
+    let cssH = 0;
+
+    function resizeCanvas() {
+      const w = Math.round(canvas.clientWidth);
+      const h = Math.round(canvas.clientHeight);
+      if (!w || !h) return false;
+      if (w === cssW && h === cssH) return true;
+      cssW = w;
+      cssH = h;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      return true;
+    }
+
+    function drawWall(x, y, cell, ox, oy) {
+      const px = ox + x * cell;
+      const py = oy + y * cell;
+      ctx.fillStyle = '#263758';
+      ctx.fillRect(px + 2, py + 2, cell - 4, cell - 4);
+      ctx.fillStyle = '#52658A';
+      ctx.fillRect(px + 4, py + 4, cell - 8, Math.max(4, cell * .16));
+      ctx.strokeStyle = '#14213D';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px + 2, py + cell * .55);
+      ctx.lineTo(px + cell - 2, py + cell * .55);
+      ctx.moveTo(px + cell * .48, py + 2);
+      ctx.lineTo(px + cell * .48, py + cell * .55);
+      ctx.moveTo(px + cell * .7, py + cell * .55);
+      ctx.lineTo(px + cell * .7, py + cell - 2);
+      ctx.stroke();
+    }
+
+    function drawGoal(cx, cy, cell) {
+      const s = cell * .68;
+      ctx.fillStyle = '#7A401D';
+      ctx.fillRect(cx - s * .48, cy - s * .28, s * .96, s * .58);
+      ctx.fillStyle = '#FFB627';
+      ctx.fillRect(cx - s * .48, cy - s * .28, s * .96, s * .16);
+      ctx.fillRect(cx - s * .08, cy - s * .28, s * .16, s * .58);
+      ctx.fillStyle = '#F7F1E1';
+      ctx.fillRect(cx - s * .055, cy - s * .02, s * .11, s * .12);
+    }
+
+    function drawSprite(cx, cy, cell) {
+      const u = Math.max(2, Math.floor(cell / 10));
+      // Pixel robot: antenna, cream face, red body, dark wheels.
+      ctx.fillStyle = '#FFB627';
+      ctx.fillRect(cx - u, cy - 5 * u, 2 * u, 2 * u);
+      ctx.fillStyle = '#C6D2E8';
+      ctx.fillRect(cx - 3 * u, cy - 3 * u, 6 * u, 4 * u);
+      ctx.fillStyle = '#14213D';
+      ctx.fillRect(cx - 2 * u, cy - 2 * u, u, u);
+      ctx.fillRect(cx + u, cy - 2 * u, u, u);
+      ctx.fillStyle = '#E23A2E';
+      ctx.fillRect(cx - 4 * u, cy + u, 8 * u, 4 * u);
+      ctx.fillStyle = '#0B1224';
+      ctx.fillRect(cx - 5 * u, cy + 2 * u, u, 3 * u);
+      ctx.fillRect(cx + 4 * u, cy + 2 * u, u, 3 * u);
+      ctx.fillStyle = '#3DDC84';
+      ctx.fillRect(cx - u, cy + 2 * u, 2 * u, u);
+    }
+
+    function render(now) {
+      if (!resizeCanvas()) return;
+      const pad = Math.max(14, Math.min(cssW, cssH) * .035);
+      const cell = Math.floor(Math.min((cssW - 2 * pad) / COLS, (cssH - 2 * pad) / ROWS));
+      const boardW = cell * COLS;
+      const boardH = cell * ROWS;
+      const ox = Math.floor((cssW - boardW) / 2);
+      const oy = Math.floor((cssH - boardH) / 2);
+
+      const SEARCH_MS = 2800;
+      const ROUTE_MS = 900;
+      const WALK_MS = 2500;
+      const HOLD_MS = 900;
+      const CYCLE_MS = SEARCH_MS + ROUTE_MS + WALK_MS + HOLD_MS;
+      const elapsed = reducedMotion ? SEARCH_MS + ROUTE_MS + WALK_MS : (now - startedAt) % CYCLE_MS;
+      const searchedN = Math.ceil(Math.min(1, elapsed / SEARCH_MS) * search.visited.length);
+      const routeP = Math.max(0, Math.min(1, (elapsed - SEARCH_MS) / ROUTE_MS));
+      const walkP = Math.max(0, Math.min(1, (elapsed - SEARCH_MS - ROUTE_MS) / WALK_MS));
+
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.fillStyle = '#0F1830';
+      ctx.fillRect(0, 0, cssW, cssH);
+
+      // Checkerboard grass gives the planner a familiar game-map look.
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          ctx.fillStyle = (x + y) % 2 ? '#173E46' : '#1B4850';
+          ctx.fillRect(ox + x * cell, oy + y * cell, cell, cell);
+          ctx.strokeStyle = 'rgba(198,210,232,.06)';
+          ctx.strokeRect(ox + x * cell + .5, oy + y * cell + .5, cell - 1, cell - 1);
+        }
+      }
+
+      for (let n = 0; n < searchedN; n++) {
+        const p = search.visited[n];
+        ctx.fillStyle = 'rgba(255,182,39,.46)';
+        ctx.fillRect(ox + p.x * cell + 3, oy + p.y * cell + 3, cell - 6, cell - 6);
+      }
+
+      walls.forEach((k) => {
+        const p = parseKey(k);
+        drawWall(p.x, p.y, cell, ox, oy);
+      });
+
+      const routeCount = routeP <= 0 ? 0 : Math.max(2, Math.ceil(routeP * search.path.length));
+      if (routeCount) {
+        ctx.save();
+        ctx.strokeStyle = '#5CE1E6';
+        ctx.lineWidth = Math.max(5, cell * .18);
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = '#5CE1E6';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        search.path.slice(0, routeCount).forEach((p, idx) => {
+          const x = ox + (p.x + .5) * cell;
+          const y = oy + (p.y + .5) * cell;
+          idx ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      const goalX = ox + (goal.x + .5) * cell;
+      const goalY = oy + (goal.y + .5) * cell;
+      drawGoal(goalX, goalY, cell);
+
+      let spriteX = ox + (start.x + .5) * cell;
+      let spriteY = oy + (start.y + .5) * cell;
+      if (walkP > 0 && search.path.length > 1) {
+        const at = walkP * (search.path.length - 1);
+        const idx = Math.min(search.path.length - 2, Math.floor(at));
+        const t = at - idx;
+        const a = search.path[idx];
+        const b = search.path[idx + 1];
+        spriteX = ox + (a.x + (b.x - a.x) * t + .5) * cell;
+        spriteY = oy + (a.y + (b.y - a.y) * t + .5) * cell;
+      }
+      drawSprite(spriteX, spriteY, cell);
+    }
+
+    function frame(now) {
+      frameId = 0;
+      if (!active) return;
+      render(now);
+      if (!reducedMotion) frameId = requestAnimationFrame(frame);
+    }
+
+    function restart() {
+      startedAt = performance.now();
+      if (frameId) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(frame);
+    }
+
+    replayButton?.addEventListener('click', restart);
+    window.addEventListener('resize', () => {
+      cssW = 0;
+      if (active && !frameId) frameId = requestAnimationFrame(frame);
+    });
+
+    return {
+      setActive(on) {
+        active = on;
+        if (active) restart();
+        else if (frameId) {
+          cancelAnimationFrame(frameId);
+          frameId = 0;
+        }
+      }
+    };
+  }
 
   // hash deep-link
   const m = location.hash.match(/^#(\d+)/);

@@ -1,7 +1,7 @@
 # Maker Faire posters
 
 Two 18"×24" (portrait) posters for the booth. For the **spoken walk-through**
-(18-slide HTML deck aimed at people who know basic algorithms but not ML), see
+(17-slide HTML deck aimed at people who know basic algorithms but not ML), see
 [`slides/`](../slides/).
 
 | poster | audience | what it covers |
