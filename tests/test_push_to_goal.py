@@ -400,7 +400,7 @@ class TestHttpSurface(unittest.TestCase):
         self.assertIsNone(tb4._get('ball_goal'))
 
     def test_index_renders_the_ball_goal_controls(self):
-        """The UI is one big template string — a typo breaks the whole page."""
+        """The UI is one big Jinja template — a typo breaks the whole page."""
         html = self.client.get('/').get_data(as_text=True)
         for needle in ('ball_goal_mode', 'clearBallGoal', 'ballgoal_disp',
                        '/set_ball_goal', 'Ball goal'):

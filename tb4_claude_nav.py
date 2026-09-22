@@ -40,7 +40,7 @@ except Exception:
     _HAS_AUDIO = False
 from irobot_create_msgs.action import Dock, Undock
 from std_srvs.srv import Empty
-from flask import Flask, Response, jsonify, request, render_template, render_template_string
+from flask import Flask, Response, jsonify, request, render_template
 
 # ── Config ────────────────────────────────────────────────────────────────────
 FLASK_PORT    = 5000
@@ -125,16 +125,13 @@ DEPTH_TOPIC   = "/oakd/stereo/image_raw"   # raw stereo depth (16UC1 mm) for p25
 IMG_REFRESH_HZ = 2.0       # 2 fps
 # ─────────────────────────────────────────────────────────────────────────────
 
+# `template_folder` is relative to this module's directory (Flask's root_path),
+# NOT to the process cwd — the UI resolves from wherever the navigator is
+# started, including the systemd units and `ros2 launch`. templates/index.html
+# is committed, so a missing file means a broken checkout: render_template then
+# raises TemplateNotFound naming the path it searched, which is far more useful
+# than serving a placeholder page that hides the problem.
 app = Flask(__name__, template_folder="templates")
-
-# Load HTML template from file (source of truth for public repo);
-# tests still pass if the file is missing via the fallback string.
-_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "index.html")
-try:
-    with open(_TEMPLATE_PATH) as _tf:
-        _HTML = _tf.read()
-except FileNotFoundError:
-    _HTML = """<!DOCTYPE html><html><body>Template missing — run from repo root.</body></html>"""
 
 _lock  = threading.Lock()
 _state = {
@@ -1217,9 +1214,6 @@ def nav_loop():
         time.sleep(0.05)
 
 
-# _HTML is loaded from templates/index.html above; fallback defined there.
-
-
 # ── ToyScript runtime ───────────────────────────────────────────────────────────
 # A tiny DSL (toyscript.py) for high-level tasks. Programs live in programs/*.toy;
 # user text is matched to one and run in a thread that drives THIS navigator.
@@ -2057,10 +2051,7 @@ def _run_program(meta):
 # ── Flask routes ──────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    try:
-        return render_template("index.html")
-    except Exception:
-        return render_template_string(_HTML)
+    return render_template("index.html")
 
 @app.route('/state')
 def get_state():
