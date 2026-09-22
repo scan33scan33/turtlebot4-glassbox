@@ -1,6 +1,8 @@
 # Maker Faire posters
 
-Two 18"×24" (portrait) posters for the booth:
+Two 18"×24" (portrait) posters for the booth. For the **spoken walk-through**
+(17-slide HTML deck aimed at people who know basic algorithms but not ML), see
+[`slides/`](../slides/).
 
 | poster | audience | what it covers |
 |---|---|---|
@@ -25,7 +27,7 @@ cheap test print; print "fit to page".
 Any recent Chromium/Chrome works (the page size is set via CSS `@page`):
 
 ```bash
-cd posters
+cd docs/posters
 for p in poster-*.html; do
   chromium --headless --no-pdf-header-footer --print-to-pdf="${p%.html}.pdf" "$p"
 done

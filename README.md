@@ -147,7 +147,7 @@ to localhost only, change `app.run(host='0.0.0.0', ...)` to `host='127.0.0.1'`.
   assets fetched by `scripts/download_models.sh`, not committed; source `.pt`
   weights are gitignored (ultralytics re-downloads them)
 - `scripts/download_models.sh` — fetch + SHA-256 verify the OAK blobs
-- `docs/operations.md` — operational notes (`/cmd_vel` recovery, OAK gotchas)
+- `docs/` — `operations.md` (operational notes: `/cmd_vel` recovery, OAK gotchas) plus the Maker Faire materials: `docs/posters/` (18×24" booth posters, public + algorithms) and `docs/slides/` (HTML slideshow for a semi-technical booth talk)
 - `templates/index.html` — the web UI, served at `/` (kept out of the Python so
   it is lintable; Flask resolves it relative to the module, so it works from any
   cwd)
