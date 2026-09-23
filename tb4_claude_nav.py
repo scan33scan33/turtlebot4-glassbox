@@ -46,8 +46,19 @@ from flask import Flask, Response, jsonify, request, render_template
 FLASK_PORT    = 5000
 GRID_RES      = 0.05      # m/cell
 GRID_CELLS    = 120       # 120×120 = 6 m × 6 m (robot at centre)
-ROBOT_R       = 0.18      # hard collision radius (m): cells this close to an obstacle are impassable
-INFLATE_R     = 0.30      # soft-cost falloff distance (m): A* is penalised for hugging walls
+ROBOT_R       = 0.18      # hard collision radius (m): cells this close to an obstacle are
+                          #     impassable. Physical TB4 circumscribed radius ≈ 0.170 m — do NOT
+                          #     raise this to buy margin (the bot then can't fit doorways);
+                          #     buy margin with INFLATE_R / SMOOTH_CLEAR_M instead.
+INFLATE_R     = 0.40      # soft-cost falloff distance (m): A* is penalised for hugging walls.
+                          #     Runtime-tunable from the UI (planner_cfg slider "Soft cushion").
+SMOOTH_CLEAR_M = 0.25     # m — a path-smoothing shortcut may not pass closer than this to an
+                          #     obstacle. Without it smooth_path string-pulls straight through
+                          #     the soft band back to ROBOT_R, undoing A*'s clearance (the
+                          #     classic "clipped the edge" failure). ROBOT_R = off (legacy:
+                          #     shortcuts may skim the whole soft band); ≥ INFLATE_R = shortcuts
+                          #     must stay in fully-free cells. Runtime-tunable (UI slider
+                          #     "Smoother clearance").
 COST_SCALE    = 8.0       # soft-cost steepness per metre (≈ Nav2 cost_scaling_factor)
 COST_WEIGHT   = 1.5       # max soft penalty added to move cost at the hard edge
 DRIVE_SPEED   = 0.22      # m/s forward (cruise; scaled by cos(heading error))
@@ -311,6 +322,24 @@ def build_grid(scan: LaserScan) -> np.ndarray:
     return cost
 
 
+def _soft_cost_at(d: float) -> float:
+    """Soft cost of a cell at clearance d (m) — scalar mirror of build_grid's
+    field, so other code can reason in metres instead of cost units."""
+    if d <= ROBOT_R:     return math.inf
+    if d >= INFLATE_R:   return 0.0
+    return COST_WEIGHT * math.exp(-COST_SCALE * (d - ROBOT_R))
+
+
+def _smooth_keep_cost() -> float:
+    """Cost ceiling applied to smoother shortcuts (see smooth_path), derived from
+    SMOOTH_CLEAR_M so the UI slider reads as metres of guaranteed clearance.
+    ≤ ROBOT_R → no soft limit (legacy skim); ≥ INFLATE_R → shortcuts must stay
+    in fully-free cells."""
+    if SMOOTH_CLEAR_M <= ROBOT_R:   return math.inf
+    if SMOOTH_CLEAR_M >= INFLATE_R: return 0.0
+    return _soft_cost_at(SMOOTH_CLEAR_M)
+
+
 # ── A* ────────────────────────────────────────────────────────────────────────
 def astar(grid: np.ndarray, start: tuple, goal: tuple):
     R, C = grid.shape
@@ -374,9 +403,12 @@ def smooth_path(grid: np.ndarray, path: list) -> list:
     clearance the cost field bought isn't smoothed away."""
     if not path or len(path) < 3:
         return path
-    keep = COST_WEIGHT         # only hard obstacles (∞) block a shortcut; lets the
-                               # smoother straighten through the soft band (A* still
-                               # prefers clearance) — avoids 16-vertex zig-zag detours
+    # BUG HISTORY: keep was COST_WEIGHT, but max_cost is exclusive (cell cost
+    # > keep fails) and the max soft cost IS COST_WEIGHT, so no soft cell ever
+    # blocked a shortcut — smoothing pulled the path back to ROBOT_R from walls,
+    # exactly the "clipped the edge" failure. Now the ceiling comes from
+    # SMOOTH_CLEAR_M so a shortcut must keep that many metres of clearance.
+    keep = _smooth_keep_cost()
     out = [path[0]]
     i = 0
     while i < len(path) - 1:
@@ -1003,7 +1035,8 @@ class DriveRecorder:
                                goal_odom=list(goal_odom) if goal_odom else None,
                                start_pose=list(pose), grid_res=GRID_RES,
                                grid_cells=GRID_CELLS, robot_r=ROBOT_R,
-                               inflate_r=INFLATE_R, cost_scale=COST_SCALE,
+                               inflate_r=INFLATE_R, smooth_clear_m=SMOOTH_CLEAR_M,
+                               cost_scale=COST_SCALE,
                                cost_weight=COST_WEIGHT, drive_speed=DRIVE_SPEED,
                                turn_speed=TURN_SPEED, goal_tol=GOAL_TOL,
                                heading_tol=HEADING_TOL, lookahead_m=LOOKAHEAD_M,
@@ -2198,6 +2231,8 @@ def get_state():
             'goal_mode':    _state['goal_mode'],
             'detections':   _state['detections'],
             'use_lidar_dist': _state['use_lidar_dist'],
+            'planner':      {'robot_r': ROBOT_R, 'inflate_r': INFLATE_R,
+                             'smooth_clear_m': SMOOTH_CLEAR_M},
             'odom_x':       round(_state['odom_x'],   3),
             'odom_y':       round(_state['odom_y'],   3),
             'odom_yaw':     round(math.degrees(_state['odom_yaw']), 1),
@@ -2387,6 +2422,29 @@ def set_lidar_dist():
     on = bool(data.get('on'))
     _set(use_lidar_dist=on)
     return jsonify({'ok': True, 'use_lidar_dist': on})
+
+@app.route('/planner_cfg', methods=['GET', 'POST'])
+def planner_cfg():
+    """Runtime-tunable planner margins backing the UI sliders. POST e.g.
+    {"inflate_r": 0.45} or {"smooth_clear_m": 0.22}. Values are module globals
+    read by build_grid/smooth_path every replan, so a change takes effect on the
+    next planning cycle (no restart); nothing is persisted across restarts.
+    ROBOT_R is deliberately NOT exposed — see the config comment.
+      inflate_r      ∈ [0.20, 0.60]  — soft cushion width (m)
+      smooth_clear_m ∈ [ROBOT_R, 0.60] — min clearance a smoother shortcut keeps (m)
+    """
+    global INFLATE_R, SMOOTH_CLEAR_M
+    if request.method == 'POST':
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            if 'inflate_r' in data:
+                INFLATE_R = min(0.60, max(0.20, float(data['inflate_r'])))
+            if 'smooth_clear_m' in data:
+                SMOOTH_CLEAR_M = min(0.60, max(ROBOT_R, float(data['smooth_clear_m'])))
+        except (TypeError, ValueError):
+            return jsonify({'ok': False, 'error': 'non-numeric value'}), 400
+    return jsonify({'ok': True, 'robot_r': ROBOT_R, 'inflate_r': INFLATE_R,
+                    'smooth_clear_m': SMOOTH_CLEAR_M })
 
 @app.route('/camera.jpg')
 def camera_jpg():

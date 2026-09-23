@@ -28,6 +28,10 @@
         button:disabled { opacity: 0.4; cursor: not-allowed; }
         .sep { border: none; border-top: 1px solid #333; margin: 10px 0; }
         .lbl { display: block; margin-top: 10px; color: #888; font-size: 0.9em; }
+        .cfg-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; color: #bbb; }
+        .cfg-row > span:first-child { width: 128px; color: #888; }
+        .cfg-row input[type=range] { flex: 1; accent-color: #4a9; }
+        .cfg-val { width: 52px; text-align: right; font-family: monospace; color: #4a9; }
         #det_list { padding: 10px; background: #0a0a0a; border: 1px solid #222; max-height: 200px; overflow-y: auto; border-radius: 3px; }
         .det-item { padding: 6px; margin: 3px 0; background: #1a1a1a; border-left: 3px solid #4a9; }
         .det-item span { color: #4a9; font-weight: bold; }
@@ -81,6 +85,24 @@
     <label class="lbl" style="display:block; margin:4px 0;">
       <input type="checkbox" id="lidar_dist" onchange="toggleLidarDist()"> Smart distance (depth p25 over the box)
     </label>
+    <hr class="sep">
+    <div class="lbl">Planner margins <span style="color:#555;">(live — apply on next replan)</span></div>
+    <div class="cfg-row">
+      <span>Soft cushion</span>
+      <input type="range" id="cfg_inflate" min="0.20" max="0.60" step="0.05" oninput="cfgChanged()">
+      <span class="cfg-val" id="cfg_inflate_v">—</span>
+    </div>
+    <div class="cfg-row">
+      <span>Smoother clearance</span>
+      <input type="range" id="cfg_smooth" min="0.18" max="0.60" step="0.01" oninput="cfgChanged()">
+      <span class="cfg-val" id="cfg_smooth_v">—</span>
+    </div>
+    <div style="font-size:11px; color:#777; margin:0 0 4px;">
+      Soft cushion = how far out A* starts avoiding walls (higher → keeps more distance,
+      still fits doorways; robot radius stays 0.18 m).
+      Smoother clearance = the path-straightener may not pull a shortcut closer than this
+      to an obstacle (set to 0.18 = off / old skim behaviour; ≥ cushion = stay fully clear).
+    </div>
     <hr class="sep">
     <div class="lbl">Task (ToyScript) — say what you want</div>
     <input type="text" id="task_input" placeholder="clean up the toys, find the bottle, go home…"
@@ -167,6 +189,7 @@ function update() {
     }
     const ldc = document.getElementById('lidar_dist');
     if (ldc && document.activeElement !== ldc) ldc.checked = !!s.use_lidar_dist;
+    if (s.planner) syncPlannerCfg(s.planner);
     const hb = document.getElementById('hazard_banner');
     if (s.hazards && s.hazards.length) {
       hb.textContent = '⚠ ' + s.hazards.map(h => h.where ? `${h.type} (${h.where})` : h.type).join(', ').toUpperCase();
@@ -228,6 +251,29 @@ function toggleRecord() {
 function toggleLidarDist() {
   const on = document.getElementById('lidar_dist').checked;
   fetch('/lidar_dist', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({on})});
+}
+
+// Planner-margin sliders: labels update live, POST is debounced while dragging.
+// /state carries the same values (syncPlannerCfg) so another client's change
+// shows up here — unless the user is actively dragging that slider.
+let _cfgTimer = null;
+function _cfgFmt(id, v) { document.getElementById(id).textContent = Number(v).toFixed(2) + ' m'; }
+function syncPlannerCfg(p) {
+  const ci = document.getElementById('cfg_inflate'), cs = document.getElementById('cfg_smooth');
+  if (ci && document.activeElement !== ci) ci.value = p.inflate_r;
+  if (cs && document.activeElement !== cs) cs.value = p.smooth_clear_m;
+  if (ci) _cfgFmt('cfg_inflate_v', ci.value);
+  if (cs) _cfgFmt('cfg_smooth_v', cs.value);
+}
+function cfgChanged() {
+  const inflate = parseFloat(document.getElementById('cfg_inflate').value);
+  const smooth  = parseFloat(document.getElementById('cfg_smooth').value);
+  _cfgFmt('cfg_inflate_v', inflate); _cfgFmt('cfg_smooth_v', smooth);
+  clearTimeout(_cfgTimer);
+  _cfgTimer = setTimeout(() => {
+    fetch('/planner_cfg', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({inflate_r: inflate, smooth_clear_m: smooth})});
+  }, 150);
 }
 
 const _LV = 400, _LS = _LV / (120 * 0.05);
