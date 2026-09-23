@@ -2174,7 +2174,7 @@ def match_program(text, progs):
 
 _run_lock = threading.Lock()
 
-def _run_program(meta):
+def _run_program(meta, display=None):
     robot = NavRobot()
     lines = []
     def log(msg):
@@ -2193,7 +2193,7 @@ def _run_program(meta):
         else:
             hist.append({'cmd': label, 'result': _fmt_res(result), 'running': False})
         _set(cmd_history=hist[-5:])
-    _set(run_active=True, run_program=meta['name'], run_log=[], run_error=None, cmd_history=[])
+    _set(run_active=True, run_program=display or meta['name'], run_log=[], run_error=None, cmd_history=[])
     globals()['_active_robot'] = robot
     try:
         toyscript.Interpreter(robot, log=log, on_call=on_call).run(meta['source'])
@@ -2302,6 +2302,15 @@ def run_program():
         if not matched or score <= 0:
             return jsonify({'ok': False, 'error': 'no matching program',
                             'available': list(progs)}), 404
+    # Show the parsed target in the program label — "follow dog" runs as
+    # "follow(dog)" in the run header / "understood as skill" line / recorder
+    # meta, not a bare "follow". The EFFECTIVE target is shown (so a phrase the
+    # parser could not resolve, e.g. "follow dogf", visibly reads
+    # "follow(person)" — the default it will actually follow — instead of
+    # silently pretending it understood).
+    display = matched['name']
+    if matched['name'] == 'follow':
+        display = f"follow({fp['target'] or 'person'})"
     _set(target_color=_parse_color(text),
          follow_target=fp['target'],
          follow_standoff=fp['standoff'],
@@ -2310,8 +2319,9 @@ def run_program():
          last_command=(text or matched['name']),
          match_score=round(score, 2),
          plan=matched.get('plan') or [])
-    threading.Thread(target=_run_program, args=(matched,), daemon=True).start()
-    return jsonify({'ok': True, 'program': matched['name'], 'target_color': _get('target_color'),
+    threading.Thread(target=_run_program, args=(matched, display), daemon=True).start()
+    return jsonify({'ok': True, 'program': matched['name'], 'display': display,
+                    'target_color': _get('target_color'),
                     'follow': fp,
                     'description': matched['description'], 'score': round(score, 3)})
 
