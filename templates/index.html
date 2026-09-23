@@ -14,8 +14,8 @@
         .control-panel { grid-column: 1; }
         .det-panel { grid-column: 1; }
         .photo-panel { grid-column: 2; grid-row: 3; }
-        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin-top: 8px; max-height: 280px; overflow-y: auto; }
-        .photo-grid a { display: block; }
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 8px; max-height: 150px; overflow-y: auto; }
+        .photo-grid a { display: block; cursor: pointer; }
         .photo-grid img { width: 100%; border: 1px solid #333; border-radius: 3px; }
         .photo-grid a.latest img { outline: 2px solid #4a9; }
         img { max-width: 100%; height: auto; border-radius: 4px; }
@@ -69,6 +69,13 @@
     <div style="margin:6px 0;">
       <button class="btn" onclick="takePhoto()">📷 Take picture</button>
       <span id="photo_status" style="margin-left:8px; color:#888; font-size:11px;"></span>
+    </div>
+    <div id="photo_viewer" style="display:none;">
+      <img id="photo_big" src="" alt="snapshot" title="click to open full size" style="width:100%; max-height:280px; object-fit:contain; background:#0a0a0a; border:1px solid #333; border-radius:3px; display:block; cursor:zoom-in;" onclick="if (_selPhoto) window.open('/photos/' + _selPhoto, '_blank');">
+      <div style="font-size:10px; color:#888; margin-top:3px;">
+        <span id="photo_name"></span>
+        <a id="photo_full" href="#" target="_blank" style="color:#4a9; float:right;">open full size ↗</a>
+      </div>
     </div>
     <div id="photo_empty" style="font-size:11px; color:#666; margin-top:6px;">No pictures yet — snapshots save with the detection overlay, i.e. exactly what the robot saw.</div>
     <div id="photo_gallery" class="photo-grid"></div>
@@ -207,9 +214,9 @@ function update() {
     if (s.planner) syncPlannerCfg(s.planner);
     // Show a snapshot regardless of who took it (UI button, PHOTO() primitive,
     // another browser) — once per filename, so the poll doesn't fight the user.
-    // Refresh the gallery whenever a new snapshot lands — no matter who took
-    // it (UI button, PHOTO() primitive, another browser) — once per filename.
-    if (s.last_photo && s.last_photo !== _shownPhoto) { _shownPhoto = s.last_photo; loadPhotos(); }
+    // A new snapshot (button here, PHOTO() in a program, another browser):
+    // show it in the viewer and refresh the gallery — once per filename.
+    if (s.last_photo && s.last_photo !== _shownPhoto) { _shownPhoto = s.last_photo; selectPhoto(s.last_photo); loadPhotos(); }
     const hb = document.getElementById('hazard_banner');
     if (s.hazards && s.hazards.length) {
       hb.textContent = '⚠ ' + s.hazards.map(h => h.where ? `${h.type} (${h.where})` : h.type).join(', ').toUpperCase();
@@ -352,7 +359,15 @@ function runTask() {
 function stopTask() { fetch('/run_stop', {method:'POST'}); }
 
 // ── Snapshots (Pictures card) ──
-let _shownPhoto = null;
+let _shownPhoto = null;   // newest name seen via /state (poll guard)
+let _selPhoto = null;     // the picture currently shown large in the viewer
+function selectPhoto(name) {
+  _selPhoto = name;
+  document.getElementById('photo_big').src = '/photos/' + name;
+  document.getElementById('photo_name').textContent = name;
+  document.getElementById('photo_full').href = '/photos/' + name;
+  document.getElementById('photo_viewer').style.display = 'block';
+}
 function takePhoto() {
   const st = document.getElementById('photo_status');
   st.textContent = '…';
@@ -360,6 +375,7 @@ function takePhoto() {
     if (!j.ok) { st.textContent = '⚠ ' + (j.error || 'failed'); return; }
     _shownPhoto = j.name;
     st.textContent = '📷 ' + j.name + (j.stale ? '  ⚠ camera frame was stale (>3 s old)' : '');
+    selectPhoto(j.name);            // show the new picture right away
     loadPhotos();
   }).catch(() => { st.textContent = '⚠ request failed'; });
 }
@@ -367,11 +383,17 @@ function loadPhotos() {
   fetch('/photos').then(r => r.json()).then(j => {
     const names = j.photos || [];
     document.getElementById('photo_empty').style.display = names.length ? 'none' : 'block';
-    document.getElementById('photo_gallery').innerHTML = names.map(function(n, i) {
-      return '<a href="/photos/' + n + '" target="_blank" title="' + n + '"' +
-             (i === 0 ? ' class="latest"' : '') +
+    document.getElementById('photo_gallery').innerHTML = names.map(function(n) {
+      return '<a href="/photos/' + n + '" title="' + n + '"' +
+             ' onclick="selectPhoto(\'' + n + '\'); return false;"' +
+             (n === _selPhoto ? ' class="latest"' : '') +
              '><img loading="lazy" src="/photos/' + n + '" alt="' + n + '"></a>';
     }).join('');
+    // Default the viewer to the newest snapshot; hide it if none exist.
+    if (!_selPhoto || names.indexOf(_selPhoto) < 0) {
+      if (names.length) selectPhoto(names[0]);
+      else { _selPhoto = null; document.getElementById('photo_viewer').style.display = 'none'; }
+    }
   }).catch(() => {});
 }
 loadPhotos();
