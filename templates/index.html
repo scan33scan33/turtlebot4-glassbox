@@ -13,6 +13,11 @@
         .lidar-panel { grid-column: 2; grid-row: 1 / 3; }
         .control-panel { grid-column: 1; }
         .det-panel { grid-column: 1; }
+        .photo-panel { grid-column: 2; grid-row: 3; }
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin-top: 8px; max-height: 280px; overflow-y: auto; }
+        .photo-grid a { display: block; }
+        .photo-grid img { width: 100%; border: 1px solid #333; border-radius: 3px; }
+        .photo-grid a.latest img { outline: 2px solid #4a9; }
         img { max-width: 100%; height: auto; border-radius: 4px; }
         .stat-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #222; }
         .stat-row span:first-child { color: #888; }
@@ -46,16 +51,6 @@
   <div class="cam-panel panel">
     <div>Camera + YOLO — click an object to drive to it</div>
     <img id="cam" src="/camera.jpg" alt="camera" onclick="camClick(event)" style="cursor: crosshair;">
-    <div style="margin-top:6px;">
-      <button class="btn" onclick="takePhoto()">📷 Take picture</button>
-      <span id="photo_status" style="margin-left:8px; color:#888; font-size:11px;"></span>
-    </div>
-    <div id="photo_thumb" style="margin-top:6px; display:none;">
-      <a id="photo_link" href="#" target="_blank" title="open full size">
-        <img id="photo_img" src="" alt="last snapshot" style="max-height:90px; border:1px solid #333; border-radius:3px;">
-      </a>
-      <div style="font-size:10px; color:#666;">saved with the detection overlay — what the robot saw</div>
-    </div>
   </div>
 
   <div class="lidar-panel panel">
@@ -67,6 +62,16 @@
     <div class="stat-row"><span>Robot</span><span id="ry">0.000</span></div>
     <div class="stat-row"><span>Goal</span><span id="goal_disp">—</span></div>
     <div class="stat-row"><span>Ball goal</span><span id="ballgoal_disp" style="color:#fc3;">—</span></div>
+  </div>
+
+  <div class="photo-panel panel">
+    <div>Pictures</div>
+    <div style="margin:6px 0;">
+      <button class="btn" onclick="takePhoto()">📷 Take picture</button>
+      <span id="photo_status" style="margin-left:8px; color:#888; font-size:11px;"></span>
+    </div>
+    <div id="photo_empty" style="font-size:11px; color:#666; margin-top:6px;">No pictures yet — snapshots save with the detection overlay, i.e. exactly what the robot saw.</div>
+    <div id="photo_gallery" class="photo-grid"></div>
   </div>
 
   <div class="control-panel panel">
@@ -202,7 +207,9 @@ function update() {
     if (s.planner) syncPlannerCfg(s.planner);
     // Show a snapshot regardless of who took it (UI button, PHOTO() primitive,
     // another browser) — once per filename, so the poll doesn't fight the user.
-    if (s.last_photo && s.last_photo !== _shownPhoto) { _shownPhoto = s.last_photo; showPhoto(s.last_photo, false); }
+    // Refresh the gallery whenever a new snapshot lands — no matter who took
+    // it (UI button, PHOTO() primitive, another browser) — once per filename.
+    if (s.last_photo && s.last_photo !== _shownPhoto) { _shownPhoto = s.last_photo; loadPhotos(); }
     const hb = document.getElementById('hazard_banner');
     if (s.hazards && s.hazards.length) {
       hb.textContent = '⚠ ' + s.hazards.map(h => h.where ? `${h.type} (${h.where})` : h.type).join(', ').toUpperCase();
@@ -344,7 +351,7 @@ function runTask() {
 }
 function stopTask() { fetch('/run_stop', {method:'POST'}); }
 
-// ── Snapshots ──
+// ── Snapshots (Pictures card) ──
 let _shownPhoto = null;
 function takePhoto() {
   const st = document.getElementById('photo_status');
@@ -352,16 +359,22 @@ function takePhoto() {
   fetch('/photo', {method:'POST'}).then(r => r.json()).then(j => {
     if (!j.ok) { st.textContent = '⚠ ' + (j.error || 'failed'); return; }
     _shownPhoto = j.name;
-    showPhoto(j.name, j.stale);
+    st.textContent = '📷 ' + j.name + (j.stale ? '  ⚠ camera frame was stale (>3 s old)' : '');
+    loadPhotos();
   }).catch(() => { st.textContent = '⚠ request failed'; });
 }
-function showPhoto(name, stale) {
-  document.getElementById('photo_status').textContent =
-    '📷 ' + name + (stale ? '  ⚠ camera frame was stale (>3 s old)' : '');
-  document.getElementById('photo_link').href = '/photos/' + name;
-  document.getElementById('photo_img').src  = '/photos/' + name;
-  document.getElementById('photo_thumb').style.display = 'block';
+function loadPhotos() {
+  fetch('/photos').then(r => r.json()).then(j => {
+    const names = j.photos || [];
+    document.getElementById('photo_empty').style.display = names.length ? 'none' : 'block';
+    document.getElementById('photo_gallery').innerHTML = names.map(function(n, i) {
+      return '<a href="/photos/' + n + '" target="_blank" title="' + n + '"' +
+             (i === 0 ? ' class="latest"' : '') +
+             '><img loading="lazy" src="/photos/' + n + '" alt="' + n + '"></a>';
+    }).join('');
+  }).catch(() => {});
 }
+loadPhotos();
 function _mode() { return document.getElementById('push_mode').checked ? 'push' : 'move'; }
 function _ballGoalMode() { const e = document.getElementById('ball_goal_mode'); return !!(e && e.checked); }
 </script>

@@ -2509,6 +2509,18 @@ def take_photo():
     r = save_photo()
     return jsonify(r), (200 if r.get('ok') else 409)
 
+@app.route('/photos')
+def photo_list():
+    """List saved snapshots, newest first — the Pictures card polls this for its
+    gallery. Filenames only (the name already encodes the capture time); the
+    count is capped so a long-running Pi doesn't serve a huge listing."""
+    try:
+        names = [n for n in os.listdir(PHOTO_DIR) if n.endswith('.jpg')]
+        names.sort(key=lambda n: os.path.getmtime(os.path.join(PHOTO_DIR, n)), reverse=True)
+        return jsonify({'ok': True, 'photos': names[:50]})
+    except FileNotFoundError:
+        return jsonify({'ok': True, 'photos': []})
+
 @app.route('/photos/<path:name>')
 def photo_file(name):
     """Serve a saved snapshot (the UI thumbnail and its open-full-size link)."""
