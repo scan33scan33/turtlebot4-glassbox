@@ -36,11 +36,7 @@ into autonomous behaviors:
 | `push_ball_to_goal` | find the ball and push it to **the spot you marked**. Pick the goal, then run it. |
 | `push_ball_to_wall` | find a ball, centre it, push it to the wall (camera-only). No goal needed — **the field-proven default.** |
 | `push_to_wall` | same task with a lidar wall-goal + camera steering + lidar close-range ball tracking (camera+lidar fusion). Experimental. |
-| `follow_human` | follow the closest person at a safe 1 m standoff to help carry things — never drives into them. |
-| `follow` | follow anything you name from the COCO list (person, dog, cat, bottle, chair, cup, …). |
-| `follow_dog` | follow the closest dog at a safe distance. |
-| `follow_ball` | follow the ball at a safe distance *without* pushing it. |
-| `follow_ball_aggressive` | chase the ball hard, predicting where it went with the lidar when the camera loses it. |
+| `follow` | follow **anything** you name from the COCO list (person, dog, cat, ball, bottle, chair, cup, …), or just "follow me" / "help me carry" for the closest person. Routes around furniture and never drives into the target. Distance and technique adapt to what you named: a big target (person, dog) is followed at once from a 1 m standoff; a small low one (ball, bottle, cup) from 0.7 m, acquired with a step-and-stare sweep first — and say "…aggressively" / "track the ball" / "predict the ball" to also use the lidar + velocity predictor that bridges the camera's gaps. |
 | `open_explore` | roam toward the most open space, avoiding obstacles. |
 
 Trigger by phrase (e.g. "push the ball to the goal", "push the ball to the wall",
@@ -76,8 +72,8 @@ Returns `at goal` / `stalled` (jammed) / `lost` / `blocked` / `no-goal`.
 ```bash
 ssh ubuntu@<pi>
 cd ~/Workspace/turtlebot4-glassbox
-bash scripts/download_models.sh   # ONCE per clone: fetch the OAK-D YOLO blobs
-bash run_oakd.sh     # OAK-D camera + on-VPU YOLO   (logs ~/oak_rgbd.log)
+bash object_detection/download_models.sh   # ONCE per clone: fetch the OAK-D YOLO blobs
+bash object_detection/run_oakd.sh     # OAK-D camera + on-VPU YOLO   (logs ~/oak_rgbd.log)
 bash run_nav.sh      # navigator + web UI on :5000  (logs ~/nav.log)
 ```
 
@@ -88,7 +84,7 @@ small and the repo doesn't redistribute AGPL-licensed weights (see
 Open `http://<pi>:5000`. Pre-flight is one glance — the **Health** row shows
 `cam · lidar · base` dots; **3 green = go**. Undock, then run a behavior.
 
-`chime.sh` is one-command recovery from ANY state: it converges to
+`devtools/chime.sh` is one-command recovery from ANY state: it converges to
 cam+lidar+base all live (rebooting the Create 3, restarting `turtlebot4.service`,
 spinning the lidar motor, restarting nav — only the steps actually needed) and
 guarantees the READY chime. Add `--base` to force a Create 3 reboot up front
@@ -108,7 +104,7 @@ lidar grid, planned paths, detections, camera frame, and the running skill).
 Render a `camera | BEV | skill` video:
 
 ```bash
-python3 dataset_tools.py datasets/drive_YYYYMMDD_HHMMSS --video
+python3 devtools/dataset_tools.py datasets/drive_YYYYMMDD_HHMMSS --video
 ```
 
 ## Tests
@@ -138,24 +134,29 @@ to localhost only, change `app.run(host='0.0.0.0', ...)` to `host='127.0.0.1'`.
 - `programs/*.toy` — the behaviors
 - `tests/test_push_to_goal.py` — closed-loop tests for the ball-push geometry and
   `PUSH_TO_GOAL` (ROS stubbed, no hardware needed)
-- `dataset_tools.py` — load / inspect / render recorded drives
-- `oakd_rgbd.launch.py` — OAK-D spatial-YOLO launch (custom; bypasses bringup)
-- `run_nav.sh` / `run_oakd.sh` — launch;  `chime.sh` — one-command recovery + chime
-  (honors `TB4_HOST`, `TB4_BASE`, `TB4_ROOT`, `TB4_SUDO_PW` env vars — never committed)
+- `devtools/dataset_tools.py` — load / inspect / render recorded drives
+- `run_nav.sh` (navigator launch), `object_detection/run_oakd.sh` (camera launch) — launch;  `devtools/chime.sh` — one-command recovery + chime
+  (honors `TB4_HOST`, `TB4_BASE`, `TB4_ROOT`, `TB4_SUDO_PW` env vars — never
+  committed; `run_oakd.sh` also honors `TB4_OAKD_MODEL` to pick the detector)
 - `services/` — systemd units: everything auto-starts on boot (+ ready chime)
-- `models/` — nn configs for the deployed OAK blobs. The `.blob` files
-  themselves are Release assets fetched by `scripts/download_models.sh`, not
-  committed; source `.pt` weights are gitignored (ultralytics re-downloads them)
-- `scripts/download_models.sh` — fetch + SHA-256 verify the OAK blobs
+- `object_detection/` — `nn_base.json` (the shared decode config: COCO-80 labels +
+  thresholds) and `DEFAULT_MODEL` (which blob to launch). `oakd_rgbd.launch.py`
+  combines the two at launch and writes the per-blob config to `/tmp`, so nothing
+  committed carries an absolute path. The `.blob` files themselves are Release
+  assets fetched by `object_detection/download_models.sh`, not committed; source `.pt`
+  weights are gitignored (ultralytics re-downloads them)
+- `object_detection/download_models.sh` — fetch + SHA-256 verify the OAK blobs
 - `docs/` — `operations.md` (operational notes: `/cmd_vel` recovery, OAK gotchas) plus the Maker Faire materials: `docs/posters/` (18×24" booth posters, public + algorithms) and `docs/slides/` (HTML slideshow for a semi-technical booth talk)
-- `templates/index.html` — web UI source (extracted from `tb4_claude_nav.py:_HTML` for lintability)
-- `goal_cycle.py` / `goal_run.py` — standalone chime + drive-leg loop, driven off
-  nav's `/state` (a shuttle test used to validate `/cmd_vel` end-to-end; not
-  imported by the navigator)
+- `templates/index.html` — the web UI, served at `/` (kept out of the Python so
+  it is lintable; Flask resolves it relative to the module, so it works from any
+  cwd)
+- `devtools/` — operator scaffolding, **not** imported by anything: a standalone
+  chime + drive-leg loop driven off nav's `/state`, used to validate `/cmd_vel`
+  end-to-end. See `devtools/README.md`.
 - `fastdds_no_shm.xml` — Fast-DDS profile that disables shared-memory transport;
   this box's SHM is flaky and caused "rcl node's context is invalid" crashes.
   Every launch script exports it as `FASTRTPS_DEFAULT_PROFILES_FILE`.
-- `training/` and `objdet18/` — optional custom-detector training pipelines
+- `object_detection/training/` — optional custom-detector training pipelines
   (needs `ultralytics`; see the licensing note below)
 
 ## License
@@ -168,7 +169,7 @@ weights, which are **AGPL-3.0** (Ultralytics also sells a commercial Enterprise
 License). They are distributed as Release assets rather than committed here, so
 this repository's tree is MIT throughout — but the blobs you download are not,
 and neither is anything you build from them. The same applies to the
-`training/` and `objdet18/` scripts that import `ultralytics`. The navigator
+`object_detection/training/` scripts that import `ultralytics`. The navigator
 itself does not — inference runs on the OAK-D's VPU from a compiled blob —
 which is why `ultralytics` is not in the default `requirements.txt` install.
 

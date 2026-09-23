@@ -1,14 +1,39 @@
 # name: follow
-# description: follow anything you name from the COCO list (person, dog, cat, bottle, chair, cup...)
-# triggers: follow the, follow that, follow it, come with me, keep near it, trail the, tail the, stay with, keep close to
-# plan: locate the target@FOLLOW | trail it at a safe distance@FOLLOW
+# description: follow anything you name from the COCO list (person, dog, cat, ball, bottle, chair, cup...), or just "follow me"
+# triggers: follow the, follow that, follow it, follow me, come with me, help me carry, carry mode, follow the human, follow person, follow the person, follow the dog, follow dog, chase the dog, follow the puppy, come with dog, track the dog, follow the ball, follow ball, chase the ball, trail the ball, tail the ball, keep near the ball, follow the ball aggressively, aggressive ball follow, chase the ball fast, track the ball, predict the ball, keep near it, trail the, tail the, stay with, keep close to
+# plan: work out what to follow@FOLLOW | trail it at a safe distance@FOLLOW
 #
-# Generic follow: say "follow the <object>" for any COCO class (synonyms like
-# couch/tv/table understood). Trails the closest one at a safe standoff — move
-# mode, obstacle-aware, never pushes — and turns to re-find it if it leaves view.
-# The target is parsed from your command (pushing stays ball-only; the robot
-# can't push arbitrary objects). Runs until Stop.
+# THE ONLY follow program: say "follow the <object>" for any COCO class
+# (synonyms like couch/tv/table/puppy understood), or just "follow me".
+#
+# It hard-codes no target, distance or controller, because none of those are
+# per-program choices — they follow from WHAT you named:
+#
+#   * big target (person, dog, chair...) — start following at once, stand off 1 m
+#     and ease to a stop rather than crowd it; if it leaves the frame, hold
+#     briefly, then turn toward where it was last seen and sweep.
+#   * small, low target (ball, bottle, cup...) — stand off 0.7 m, because the
+#     416-px preview loses a ~40 cm object at 1 m, and acquire it first with a
+#     step-and-stare SCAN_FOR: FOLLOW's re-acquire is a continuous spin, which
+#     the OAK detects poorly through, so it sails straight past a ball. Hence
+#     "could not find it" rather than orbiting an empty room.
+#   * "... aggressively / fast / hard", or "track/predict the ball" — also use the
+#     lidar + velocity predictor that bridges the camera's ~2 fps gaps. Small
+#     targets only: its lidar model hunts a close blob on the floor, which is
+#     wrong for a person and unnecessary, since the camera holds those in frame.
+#
+# That is all resolved in ONE place, tb4_claude_nav.py:_follow_params(), and
+# surfaced in /state under `follow` so you can see what it decided. This file
+# used to be four that differed only in those constants, and /run's routing made
+# two of them unreachable — see docs/simplification-plan.md §1.1 and §3.5.
+#
+# Always MOVE semantics, never push: it routes around furniture and stops short.
+# Runs until you press Stop.
 
 PRINT "Following — press Stop to end."
-SET r = FOLLOW("person", 1.0)
-PRINT "Stopped following."
+SET r = FOLLOW()
+IF r == "not-found" THEN
+    PRINT "Could not find anything to follow in the room."
+ELSE
+    PRINT "Stopped following."
+END

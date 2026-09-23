@@ -1,0 +1,7 @@
+dataset/
+runs/
+*.pt
+*.onnx
+*.tar.gz
+*.zip
+__pycache__/

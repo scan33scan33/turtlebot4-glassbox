@@ -27,20 +27,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Globbed from git, not enumerated: a hand-maintained file list silently
+      # stops covering any new file (and breaks outright when one is moved).
       - name: Compile every Python file
         run: |
-          python -m compileall -q \
-            tb4_claude_nav.py toyscript.py dataset_tools.py goal_cycle.py \
-            goal_run.py oakd_rgbd.launch.py tests training objdet18
+          git ls-files -z '*.py' | xargs -0 -r python -m compileall -q
 
       - name: Check shell scripts parse
         run: |
-          for f in chime.sh run_nav.sh run_oakd.sh \
-                   scripts/download_models.sh \
-                   services/install.sh services/tb4-oakd-run.sh \
-                   objdet18/run_all.sh objdet18/run_coco_only.sh; do
+          while IFS= read -r f; do
             bash -n "$f" && echo "ok  $f"
-          done
+          done < <(git ls-files '*.sh')
 
       - name: Parse every .toy program
         run: |

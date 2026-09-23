@@ -10,15 +10,71 @@ from launch import LaunchDescription
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
+import json
+import os
+import tempfile
+
+# Which compiled blob to run. The default lives in object_detection/DEFAULT_MODEL so this
+# file and the startup preflight in run_oakd.sh / services/tb4-oakd-run.sh cannot
+# drift apart. Override to A/B the staged YOLOv8s swap without editing anything
+# (see object_detection/YOLOV8S_SWAP.md):
+#   TB4_OAKD_MODEL=yolov8s_416_fixed_6shave bash run_oakd.sh
+DEFAULT_MODEL_FILE = "object_detection/DEFAULT_MODEL"
+
+
+def workspace():
+    """The checkout this launch file lives in — override with TB4_ROOT."""
+    return os.environ.get(
+        "TB4_ROOT", os.path.expanduser("~/Workspace/turtlebot4-glassbox"))
+
+
+def default_model():
+    """Blob name (without .blob) to run unless TB4_OAKD_MODEL says otherwise."""
+    override = os.environ.get("TB4_OAKD_MODEL")
+    if override:
+        return override
+    path = os.path.join(workspace(), DEFAULT_MODEL_FILE)
+    with open(path) as f:
+        name = f.read().strip()
+    if not name:
+        raise RuntimeError("%s is empty" % path)
+    return name
+
+
+def write_nn_config():
+    """Materialise the depthai decode config and return its path.
+
+    This used to be three committed JSONs (`nn_yolov5mu.json`, `nn_yolov8n.json`,
+    `nn_yolov8s.json`) that were byte-identical apart from `model.model_name` —
+    so the 80 COCO labels were stored four times counting `COCO_LABELS` in the
+    navigator. Worse, that one differing value was an absolute path hardcoded to
+    `/home/ubuntu/Workspace/turtlebot4-glassbox/...`, which defeated the
+    `TB4_ROOT` portability every launch script otherwise honours: any clone
+    elsewhere pointed depthai at a blob that did not exist.
+
+    Now one committed `object_detection/nn_base.json` holds the shared `nn_config` +
+    label mappings, and the `model` block is injected here from wherever the
+    blob actually is.
+    """
+    ws = workspace()
+    model = default_model()
+    with open(os.path.join(ws, "object_detection", "nn_base.json")) as f:
+        cfg = json.load(f)
+    blob = os.path.join(ws, "object_detection", model + ".blob")
+    cfg["model"] = {"zoo": "path", "model_name": blob}
+    out = os.path.join(tempfile.gettempdir(), "tb4_nn_%s.json" % model)
+    with open(out, "w") as f:
+        json.dump(cfg, f)
+    print("[oakd] nn config : %s" % out)
+    print("[oakd] nn blob   : %s" % blob)
+    return out
+
 
 def generate_launch_description():
     # Bandwidth/stability-first config (per Gemini): the VPU was choking the
     # USB XLink (nn_pt crash + sys_logger_queue spam, no detection data). Slash
     # everything leaving the camera — low fps, low-bandwidth MJPEG, USB2, no
     # diagnostics/passthrough. Spatial YOLO at ~10 fps is plenty for nav.
-    import os
-    # Allow overriding the workspace location (default is the stock TurtleBot 4 Pi path)
-    _ws = os.environ.get("TB4_ROOT", os.path.expanduser("~/Workspace/turtlebot4-glassbox"))
     params = [{
         'camera.i_pipeline_type': 'RGBD',          # stereo+rgb so spatial NN has depth
         'camera.i_nn_type': 'spatial',
@@ -26,7 +82,7 @@ def generate_launch_description():
         'camera.i_enable_ir': False,
         'camera.i_usb_speed': 'HIGH',              # force USB2 — stable; rules out USB3 downgrade/brownout
         'camera.i_enable_diagnostics': False,      # kill the sys_logger_queue stream that was X_LINK_ERROR-spamming
-        'nn.i_nn_config_path': os.path.join(_ws, "models/nn_yolov5mu.json"),  # YOLOv5mu (v5 medium anchor-free) — fallback: models/nn_yolov8n.json
+        'nn.i_nn_config_path': write_nn_config(),  # generated at launch; TB4_OAKD_MODEL picks the blob
         'nn.i_num_inference_threads': 2,   # pipeline 2 inferences (5 shaves x 2 = device's 10)
                                                             # — newer/stronger model than YOLOv4-tiny, same 416 input + bandwidth.
         'nn.i_enable_passthrough': False,          # nn_pt passthrough stream SIGABRTs the pipeline

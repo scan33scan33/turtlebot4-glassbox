@@ -13,8 +13,9 @@ Design notes (2026-08-20):
 import json, os, subprocess, sys, time, urllib.request
 
 NAV = os.environ.get("TB4_NAV", "http://127.0.0.1:5000")
-# Portable repo root — works regardless of where the repo is cloned
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# Portable repo root — works regardless of where the repo is cloned. This file
+# lives in devtools/, so the root is one level up (it is where chime.sh is).
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def state(timeout=6):
     with urllib.request.urlopen(NAV + "/state", timeout=timeout) as r:
@@ -52,7 +53,7 @@ def twinkle():
 
 def recover():
     """Last-resort: full chime.sh recovery. Only when a stream is genuinely down."""
-    subprocess.run(["bash", os.path.join(ROOT, "chime.sh"), "--no-undock"],
+    subprocess.run(["bash", os.path.join(ROOT, "devtools", "chime.sh"), "--no-undock"],
                    cwd=ROOT, env={"TB4_SUDO_PW": os.environ.get("TB4_SUDO_PW", ""), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
                                   "HOME": os.path.expanduser("~")},
                    timeout=300, capture_output=True)
