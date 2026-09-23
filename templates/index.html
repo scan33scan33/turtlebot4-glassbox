@@ -46,6 +46,16 @@
   <div class="cam-panel panel">
     <div>Camera + YOLO — click an object to drive to it</div>
     <img id="cam" src="/camera.jpg" alt="camera" onclick="camClick(event)" style="cursor: crosshair;">
+    <div style="margin-top:6px;">
+      <button class="btn" onclick="takePhoto()">📷 Take picture</button>
+      <span id="photo_status" style="margin-left:8px; color:#888; font-size:11px;"></span>
+    </div>
+    <div id="photo_thumb" style="margin-top:6px; display:none;">
+      <a id="photo_link" href="#" target="_blank" title="open full size">
+        <img id="photo_img" src="" alt="last snapshot" style="max-height:90px; border:1px solid #333; border-radius:3px;">
+      </a>
+      <div style="font-size:10px; color:#666;">saved with the detection overlay — what the robot saw</div>
+    </div>
   </div>
 
   <div class="lidar-panel panel">
@@ -190,6 +200,9 @@ function update() {
     const ldc = document.getElementById('lidar_dist');
     if (ldc && document.activeElement !== ldc) ldc.checked = !!s.use_lidar_dist;
     if (s.planner) syncPlannerCfg(s.planner);
+    // Show a snapshot regardless of who took it (UI button, PHOTO() primitive,
+    // another browser) — once per filename, so the poll doesn't fight the user.
+    if (s.last_photo && s.last_photo !== _shownPhoto) { _shownPhoto = s.last_photo; showPhoto(s.last_photo, false); }
     const hb = document.getElementById('hazard_banner');
     if (s.hazards && s.hazards.length) {
       hb.textContent = '⚠ ' + s.hazards.map(h => h.where ? `${h.type} (${h.where})` : h.type).join(', ').toUpperCase();
@@ -330,6 +343,25 @@ function runTask() {
     });
 }
 function stopTask() { fetch('/run_stop', {method:'POST'}); }
+
+// ── Snapshots ──
+let _shownPhoto = null;
+function takePhoto() {
+  const st = document.getElementById('photo_status');
+  st.textContent = '…';
+  fetch('/photo', {method:'POST'}).then(r => r.json()).then(j => {
+    if (!j.ok) { st.textContent = '⚠ ' + (j.error || 'failed'); return; }
+    _shownPhoto = j.name;
+    showPhoto(j.name, j.stale);
+  }).catch(() => { st.textContent = '⚠ request failed'; });
+}
+function showPhoto(name, stale) {
+  document.getElementById('photo_status').textContent =
+    '📷 ' + name + (stale ? '  ⚠ camera frame was stale (>3 s old)' : '');
+  document.getElementById('photo_link').href = '/photos/' + name;
+  document.getElementById('photo_img').src  = '/photos/' + name;
+  document.getElementById('photo_thumb').style.display = 'block';
+}
 function _mode() { return document.getElementById('push_mode').checked ? 'push' : 'move'; }
 function _ballGoalMode() { const e = document.getElementById('ball_goal_mode'); return !!(e && e.checked); }
 </script>

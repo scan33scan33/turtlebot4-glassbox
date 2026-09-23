@@ -40,7 +40,7 @@ except Exception:
     _HAS_AUDIO = False
 from irobot_create_msgs.action import Dock, Undock
 from std_srvs.srv import Empty
-from flask import Flask, Response, jsonify, request, render_template
+from flask import Flask, Response, jsonify, request, render_template, send_from_directory
 
 # ── Config ────────────────────────────────────────────────────────────────────
 FLASK_PORT    = 5000
@@ -179,6 +179,8 @@ _state = {
     "detections":         [],     # [{label, conf, x_loc, y_loc, dist, x_px, y_px, w_px, h_px}]
     "cmd_sent":           None,   # last twist actually published {v, w, t} (recorder ground truth)
     "use_lidar_dist":     True,   # True: dist=min(OAK stereo, lidar@bearing); False: raw OAK
+    "last_photo":         None,   # filename of the latest snapshot in PHOTO_DIR (UI thumbnail)
+    "last_photo_t":       0.0,    # wall time that snapshot was taken
     "target_color":       None,   # colour-targeted command: only match balls of this colour
     # Follow-command parameters, all resolved from the spoken phrase in ONE place
     # (_follow_params) and consumed by NavRobot.follow — so programs/follow.toy
@@ -718,6 +720,30 @@ def render_image_with_detections(frame_rgb, detections) -> bytes:
     return bytes(buf)
 
 
+def save_photo() -> dict:
+    """Take a picture: write the latest camera frame to PHOTO_DIR, WITH the
+    detection overlay — i.e. the exact glass-box view the live feed shows, so a
+    snapshot records what the robot understood, not just pixels. Shared by the
+    /photo route (UI button) and the ToyScript PHOTO() primitive.
+    Returns {'ok', 'name', 'stale'} or {'ok': False, 'error'}. A frame older
+    than 3 s is still saved but flagged 'stale' (dead/late camera), letting the
+    caller show a warning instead of silently saving an old view."""
+    frame = _get('frame_rgb')
+    if frame is None:
+        return {'ok': False, 'error': 'no camera frame yet'}
+    try:
+        os.makedirs(PHOTO_DIR, exist_ok=True)
+        ts   = time.time()
+        name = time.strftime("photo_%Y%m%d_%H%M%S", time.localtime(ts)) + f"_{int(ts % 1 * 1000):03d}.jpg"
+        with open(os.path.join(PHOTO_DIR, name), "wb") as f:
+            f.write(render_image_with_detections(frame, _get('detections')))
+        _set(last_photo=name, last_photo_t=ts)
+        print(f"[photo] saved photos/{name}")
+        return {'ok': True, 'name': name, 'stale': (ts - (_get('img_t') or 0)) > 3.0}
+    except Exception as e:
+        return {'ok': False, 'error': f'{type(e).__name__}: {e}'}
+
+
 # ── ROS node ──────────────────────────────────────────────────────────────────
 def _lidar_range_at_bearing(scan, bearing_rad, window_deg=3.0):
     """Lidar range (m) toward a base_link bearing (rad, +left), or None.
@@ -1008,6 +1034,8 @@ def find_target(description: str) -> tuple:
 
 # ── Dataset recorder ────────────────────────────────────────────────────────
 DATASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datasets")
+# User-triggered camera snapshots (POST /photo or the ToyScript PHOTO() primitive).
+PHOTO_DIR   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photos")
 
 
 class DriveRecorder:
@@ -1351,6 +1379,14 @@ class NavRobot:
     def __init__(self): self._abort = False
 
     def abort(self): self._abort = True
+
+    def photo(self):
+        """ToyScript PHOTO(): take a picture — same snapshot as the UI button
+        (camera view with the detection overlay, saved to PHOTO_DIR). Returns
+        the saved filename, or 'error: ...' when no frame has arrived."""
+        r = save_photo()
+        return r.get('name') or ('error: ' + str(r.get('error')))
+
     def _check(self):
         if self._abort: raise toyscript.StopProgram()
 
@@ -2256,6 +2292,8 @@ def get_state():
             'plan':         _state['plan'],
             'target_color': _state['target_color'],
             'follow_target': _state['follow_target'],
+            'last_photo':   _state['last_photo'],
+            'last_photo_t': _state['last_photo_t'],
             # Glass-box: what the phrase was understood to ask for, so you can see
             # why the robot is standing 0.7 m off a ball but 1.0 m off you.
             'follow': {
@@ -2463,6 +2501,18 @@ def camera_jpg():
     jpg = render_image_with_detections(frame, dets)
     return Response(jpg, mimetype='image/jpeg',
                     headers={'Cache-Control': 'no-store'})
+
+@app.route('/photo', methods=['POST'])
+def take_photo():
+    """UI button / API: take a picture now. 200 {"ok", "name", "stale"} or
+    409 {"ok": false, "error"} when no frame has arrived yet."""
+    r = save_photo()
+    return jsonify(r), (200 if r.get('ok') else 409)
+
+@app.route('/photos/<path:name>')
+def photo_file(name):
+    """Serve a saved snapshot (the UI thumbnail and its open-full-size link)."""
+    return send_from_directory(PHOTO_DIR, name)
 
 @app.route('/lidar.png')
 def lidar_png():

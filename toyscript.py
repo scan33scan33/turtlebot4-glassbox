@@ -7,6 +7,7 @@ Primitives (provided by a Robot binding):
     FIND(name)             locate a detected object               -> {x,y} or NONE
     WAIT(secs)             dwell in place                          -> "done"
     SCAN_FOR(name[, deg])  step-and-stare sweep for an object      -> {x,y} or NONE
+    PHOTO()                take a picture (camera view + overlays)  -> filename / "error: ..."
     PUSH_AWAY(x, y[, step]) push the ball at (x,y) away            -> "pushed"/"stalled"
     PUSH_THROUGH([dist])   straight push until stall               -> "done"/"pinned"
     PUSH_TO_WALL([name])   lidar-goal + camera-steer wall push     -> "pinned"/...
@@ -266,6 +267,7 @@ class Interpreter:
                                     + ([self._num(args[1])] if len(args) > 1 else []) \
                                     + ([self._truthy(args[2])] if len(args) > 2 else []); fn = self.robot.follow
         elif N == "EXPLORE":      a = [self._num(args[0]) if args else 900];                            fn = self.robot.explore_open
+        elif N == "PHOTO":        a = [];                                                                 fn = self.robot.photo
         else:
             raise NameError(f"unknown primitive '{name}'")
         label = N + "(" + ", ".join(("%.2f" % x if isinstance(x, (int, float)) else str(x)) for x in a) + ")"
