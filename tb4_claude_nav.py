@@ -40,14 +40,25 @@ except Exception:
     _HAS_AUDIO = False
 from irobot_create_msgs.action import Dock, Undock
 from std_srvs.srv import Empty
-from flask import Flask, Response, jsonify, request, render_template
+from flask import Flask, Response, jsonify, request, render_template, send_from_directory
 
 # ── Config ────────────────────────────────────────────────────────────────────
 FLASK_PORT    = 5000
 GRID_RES      = 0.05      # m/cell
 GRID_CELLS    = 120       # 120×120 = 6 m × 6 m (robot at centre)
-ROBOT_R       = 0.18      # hard collision radius (m): cells this close to an obstacle are impassable
-INFLATE_R     = 0.30      # soft-cost falloff distance (m): A* is penalised for hugging walls
+ROBOT_R       = 0.18      # hard collision radius (m): cells this close to an obstacle are
+                          #     impassable. Physical TB4 circumscribed radius ≈ 0.170 m — do NOT
+                          #     raise this to buy margin (the bot then can't fit doorways);
+                          #     buy margin with INFLATE_R / SMOOTH_CLEAR_M instead.
+INFLATE_R     = 0.40      # soft-cost falloff distance (m): A* is penalised for hugging walls.
+                          #     Runtime-tunable from the UI (planner_cfg slider "Soft cushion").
+SMOOTH_CLEAR_M = 0.25     # m — a path-smoothing shortcut may not pass closer than this to an
+                          #     obstacle. Without it smooth_path string-pulls straight through
+                          #     the soft band back to ROBOT_R, undoing A*'s clearance (the
+                          #     classic "clipped the edge" failure). ROBOT_R = off (legacy:
+                          #     shortcuts may skim the whole soft band); ≥ INFLATE_R = shortcuts
+                          #     must stay in fully-free cells. Runtime-tunable (UI slider
+                          #     "Smoother clearance").
 COST_SCALE    = 8.0       # soft-cost steepness per metre (≈ Nav2 cost_scaling_factor)
 COST_WEIGHT   = 1.5       # max soft penalty added to move cost at the hard edge
 DRIVE_SPEED   = 0.22      # m/s forward (cruise; scaled by cos(heading error))
@@ -168,6 +179,8 @@ _state = {
     "detections":         [],     # [{label, conf, x_loc, y_loc, dist, x_px, y_px, w_px, h_px}]
     "cmd_sent":           None,   # last twist actually published {v, w, t} (recorder ground truth)
     "use_lidar_dist":     True,   # True: dist=min(OAK stereo, lidar@bearing); False: raw OAK
+    "last_photo":         None,   # filename of the latest snapshot in PHOTO_DIR (UI thumbnail)
+    "last_photo_t":       0.0,    # wall time that snapshot was taken
     "target_color":       None,   # colour-targeted command: only match balls of this colour
     # Follow-command parameters, all resolved from the spoken phrase in ONE place
     # (_follow_params) and consumed by NavRobot.follow — so programs/follow.toy
@@ -311,6 +324,24 @@ def build_grid(scan: LaserScan) -> np.ndarray:
     return cost
 
 
+def _soft_cost_at(d: float) -> float:
+    """Soft cost of a cell at clearance d (m) — scalar mirror of build_grid's
+    field, so other code can reason in metres instead of cost units."""
+    if d <= ROBOT_R:     return math.inf
+    if d >= INFLATE_R:   return 0.0
+    return COST_WEIGHT * math.exp(-COST_SCALE * (d - ROBOT_R))
+
+
+def _smooth_keep_cost() -> float:
+    """Cost ceiling applied to smoother shortcuts (see smooth_path), derived from
+    SMOOTH_CLEAR_M so the UI slider reads as metres of guaranteed clearance.
+    ≤ ROBOT_R → no soft limit (legacy skim); ≥ INFLATE_R → shortcuts must stay
+    in fully-free cells."""
+    if SMOOTH_CLEAR_M <= ROBOT_R:   return math.inf
+    if SMOOTH_CLEAR_M >= INFLATE_R: return 0.0
+    return _soft_cost_at(SMOOTH_CLEAR_M)
+
+
 # ── A* ────────────────────────────────────────────────────────────────────────
 def astar(grid: np.ndarray, start: tuple, goal: tuple):
     R, C = grid.shape
@@ -374,9 +405,12 @@ def smooth_path(grid: np.ndarray, path: list) -> list:
     clearance the cost field bought isn't smoothed away."""
     if not path or len(path) < 3:
         return path
-    keep = COST_WEIGHT         # only hard obstacles (∞) block a shortcut; lets the
-                               # smoother straighten through the soft band (A* still
-                               # prefers clearance) — avoids 16-vertex zig-zag detours
+    # BUG HISTORY: keep was COST_WEIGHT, but max_cost is exclusive (cell cost
+    # > keep fails) and the max soft cost IS COST_WEIGHT, so no soft cell ever
+    # blocked a shortcut — smoothing pulled the path back to ROBOT_R from walls,
+    # exactly the "clipped the edge" failure. Now the ceiling comes from
+    # SMOOTH_CLEAR_M so a shortcut must keep that many metres of clearance.
+    keep = _smooth_keep_cost()
     out = [path[0]]
     i = 0
     while i < len(path) - 1:
@@ -686,6 +720,30 @@ def render_image_with_detections(frame_rgb, detections) -> bytes:
     return bytes(buf)
 
 
+def save_photo() -> dict:
+    """Take a picture: write the latest camera frame to PHOTO_DIR, WITH the
+    detection overlay — i.e. the exact glass-box view the live feed shows, so a
+    snapshot records what the robot understood, not just pixels. Shared by the
+    /photo route (UI button) and the ToyScript PHOTO() primitive.
+    Returns {'ok', 'name', 'stale'} or {'ok': False, 'error'}. A frame older
+    than 3 s is still saved but flagged 'stale' (dead/late camera), letting the
+    caller show a warning instead of silently saving an old view."""
+    frame = _get('frame_rgb')
+    if frame is None:
+        return {'ok': False, 'error': 'no camera frame yet'}
+    try:
+        os.makedirs(PHOTO_DIR, exist_ok=True)
+        ts   = time.time()
+        name = time.strftime("photo_%Y%m%d_%H%M%S", time.localtime(ts)) + f"_{int(ts % 1 * 1000):03d}.jpg"
+        with open(os.path.join(PHOTO_DIR, name), "wb") as f:
+            f.write(render_image_with_detections(frame, _get('detections')))
+        _set(last_photo=name, last_photo_t=ts)
+        print(f"[photo] saved photos/{name}")
+        return {'ok': True, 'name': name, 'stale': (ts - (_get('img_t') or 0)) > 3.0}
+    except Exception as e:
+        return {'ok': False, 'error': f'{type(e).__name__}: {e}'}
+
+
 # ── ROS node ──────────────────────────────────────────────────────────────────
 def _lidar_range_at_bearing(scan, bearing_rad, window_deg=3.0):
     """Lidar range (m) toward a base_link bearing (rad, +left), or None.
@@ -976,6 +1034,8 @@ def find_target(description: str) -> tuple:
 
 # ── Dataset recorder ────────────────────────────────────────────────────────
 DATASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datasets")
+# User-triggered camera snapshots (POST /photo or the ToyScript PHOTO() primitive).
+PHOTO_DIR   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photos")
 
 
 class DriveRecorder:
@@ -1003,7 +1063,8 @@ class DriveRecorder:
                                goal_odom=list(goal_odom) if goal_odom else None,
                                start_pose=list(pose), grid_res=GRID_RES,
                                grid_cells=GRID_CELLS, robot_r=ROBOT_R,
-                               inflate_r=INFLATE_R, cost_scale=COST_SCALE,
+                               inflate_r=INFLATE_R, smooth_clear_m=SMOOTH_CLEAR_M,
+                               cost_scale=COST_SCALE,
                                cost_weight=COST_WEIGHT, drive_speed=DRIVE_SPEED,
                                turn_speed=TURN_SPEED, goal_tol=GOAL_TOL,
                                heading_tol=HEADING_TOL, lookahead_m=LOOKAHEAD_M,
@@ -1318,6 +1379,14 @@ class NavRobot:
     def __init__(self): self._abort = False
 
     def abort(self): self._abort = True
+
+    def photo(self):
+        """ToyScript PHOTO(): take a picture — same snapshot as the UI button
+        (camera view with the detection overlay, saved to PHOTO_DIR). Returns
+        the saved filename, or 'error: ...' when no frame has arrived."""
+        r = save_photo()
+        return r.get('name') or ('error: ' + str(r.get('error')))
+
     def _check(self):
         if self._abort: raise toyscript.StopProgram()
 
@@ -2141,7 +2210,7 @@ def match_program(text, progs):
 
 _run_lock = threading.Lock()
 
-def _run_program(meta):
+def _run_program(meta, display=None):
     robot = NavRobot()
     lines = []
     def log(msg):
@@ -2160,7 +2229,7 @@ def _run_program(meta):
         else:
             hist.append({'cmd': label, 'result': _fmt_res(result), 'running': False})
         _set(cmd_history=hist[-5:])
-    _set(run_active=True, run_program=meta['name'], run_log=[], run_error=None, cmd_history=[])
+    _set(run_active=True, run_program=display or meta['name'], run_log=[], run_error=None, cmd_history=[])
     globals()['_active_robot'] = robot
     try:
         toyscript.Interpreter(robot, log=log, on_call=on_call).run(meta['source'])
@@ -2198,6 +2267,8 @@ def get_state():
             'goal_mode':    _state['goal_mode'],
             'detections':   _state['detections'],
             'use_lidar_dist': _state['use_lidar_dist'],
+            'planner':      {'robot_r': ROBOT_R, 'inflate_r': INFLATE_R,
+                             'smooth_clear_m': SMOOTH_CLEAR_M},
             'odom_x':       round(_state['odom_x'],   3),
             'odom_y':       round(_state['odom_y'],   3),
             'odom_yaw':     round(math.degrees(_state['odom_yaw']), 1),
@@ -2221,6 +2292,8 @@ def get_state():
             'plan':         _state['plan'],
             'target_color': _state['target_color'],
             'follow_target': _state['follow_target'],
+            'last_photo':   _state['last_photo'],
+            'last_photo_t': _state['last_photo_t'],
             # Glass-box: what the phrase was understood to ask for, so you can see
             # why the robot is standing 0.7 m off a ball but 1.0 m off you.
             'follow': {
@@ -2267,6 +2340,15 @@ def run_program():
         if not matched or score <= 0:
             return jsonify({'ok': False, 'error': 'no matching program',
                             'available': list(progs)}), 404
+    # Show the parsed target in the program label — "follow dog" runs as
+    # "follow(dog)" in the run header / "understood as skill" line / recorder
+    # meta, not a bare "follow". The EFFECTIVE target is shown (so a phrase the
+    # parser could not resolve, e.g. "follow dogf", visibly reads
+    # "follow(person)" — the default it will actually follow — instead of
+    # silently pretending it understood).
+    display = matched['name']
+    if matched['name'] == 'follow':
+        display = f"follow({fp['target'] or 'person'})"
     _set(target_color=_parse_color(text),
          follow_target=fp['target'],
          follow_standoff=fp['standoff'],
@@ -2275,8 +2357,9 @@ def run_program():
          last_command=(text or matched['name']),
          match_score=round(score, 2),
          plan=matched.get('plan') or [])
-    threading.Thread(target=_run_program, args=(matched,), daemon=True).start()
-    return jsonify({'ok': True, 'program': matched['name'], 'target_color': _get('target_color'),
+    threading.Thread(target=_run_program, args=(matched, display), daemon=True).start()
+    return jsonify({'ok': True, 'program': matched['name'], 'display': display,
+                    'target_color': _get('target_color'),
                     'follow': fp,
                     'description': matched['description'], 'score': round(score, 3)})
 
@@ -2388,6 +2471,29 @@ def set_lidar_dist():
     _set(use_lidar_dist=on)
     return jsonify({'ok': True, 'use_lidar_dist': on})
 
+@app.route('/planner_cfg', methods=['GET', 'POST'])
+def planner_cfg():
+    """Runtime-tunable planner margins backing the UI sliders. POST e.g.
+    {"inflate_r": 0.45} or {"smooth_clear_m": 0.22}. Values are module globals
+    read by build_grid/smooth_path every replan, so a change takes effect on the
+    next planning cycle (no restart); nothing is persisted across restarts.
+    ROBOT_R is deliberately NOT exposed — see the config comment.
+      inflate_r      ∈ [0.20, 0.60]  — soft cushion width (m)
+      smooth_clear_m ∈ [ROBOT_R, 0.60] — min clearance a smoother shortcut keeps (m)
+    """
+    global INFLATE_R, SMOOTH_CLEAR_M
+    if request.method == 'POST':
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            if 'inflate_r' in data:
+                INFLATE_R = min(0.60, max(0.20, float(data['inflate_r'])))
+            if 'smooth_clear_m' in data:
+                SMOOTH_CLEAR_M = min(0.60, max(ROBOT_R, float(data['smooth_clear_m'])))
+        except (TypeError, ValueError):
+            return jsonify({'ok': False, 'error': 'non-numeric value'}), 400
+    return jsonify({'ok': True, 'robot_r': ROBOT_R, 'inflate_r': INFLATE_R,
+                    'smooth_clear_m': SMOOTH_CLEAR_M })
+
 @app.route('/camera.jpg')
 def camera_jpg():
     frame = _get('frame_rgb')
@@ -2395,6 +2501,30 @@ def camera_jpg():
     jpg = render_image_with_detections(frame, dets)
     return Response(jpg, mimetype='image/jpeg',
                     headers={'Cache-Control': 'no-store'})
+
+@app.route('/photo', methods=['POST'])
+def take_photo():
+    """UI button / API: take a picture now. 200 {"ok", "name", "stale"} or
+    409 {"ok": false, "error"} when no frame has arrived yet."""
+    r = save_photo()
+    return jsonify(r), (200 if r.get('ok') else 409)
+
+@app.route('/photos')
+def photo_list():
+    """List saved snapshots, newest first — the Pictures card polls this for its
+    gallery. Filenames only (the name already encodes the capture time); the
+    count is capped so a long-running Pi doesn't serve a huge listing."""
+    try:
+        names = [n for n in os.listdir(PHOTO_DIR) if n.endswith('.jpg')]
+        names.sort(key=lambda n: os.path.getmtime(os.path.join(PHOTO_DIR, n)), reverse=True)
+        return jsonify({'ok': True, 'photos': names[:50]})
+    except FileNotFoundError:
+        return jsonify({'ok': True, 'photos': []})
+
+@app.route('/photos/<path:name>')
+def photo_file(name):
+    """Serve a saved snapshot (the UI thumbnail and its open-full-size link)."""
+    return send_from_directory(PHOTO_DIR, name)
 
 @app.route('/lidar.png')
 def lidar_png():

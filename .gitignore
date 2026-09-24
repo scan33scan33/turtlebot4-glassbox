@@ -28,6 +28,7 @@ runs/
 
 # Snapshot/debug images
 tb4_snapshot.png
+photos/
 tb4_view.png
 
 # Per-drive planner datasets (logged by tb4_claude_nav.py's DriveRecorder)

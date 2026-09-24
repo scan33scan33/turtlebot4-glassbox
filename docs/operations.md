@@ -109,3 +109,23 @@ reached over SSH (`turtlebot4.lan`); on boot the three systemd services
   `/hazard_detection` event-driven (silent when clear), so the nav auto-clears
   the banner ~2 s after the last msg. (System file, not in the repo —
   re-apply on a fresh image.)
+
+- **"Clips obstacles on the edge" — tune the planner margins from the UI, not
+  `ROBOT_R`.** The physical TB4 circumscribed radius is ≈ 0.170 m and
+  `ROBOT_R = 0.18` (fixed in code on purpose — raising it blocks doorways).
+  Two live sliders in the web UI ("Planner margins", backed by
+  `POST /planner_cfg`) adjust clearance without touching the footprint:
+  - *Soft cushion* (`INFLATE_R`, default 0.40 m): how far out the soft cost
+    reaches, i.e. how early A\* starts preferring the middle of open space.
+  - *Smoother clearance* (`SMOOTH_CLEAR_M`, default 0.25 m): the path
+    straightener may not pull a shortcut closer than this to an obstacle.
+    History: the smoother's cost ceiling used to be `COST_WEIGHT`, but the
+    check is exclusive and the max soft cost IS `COST_WEIGHT`, so no soft
+    cell ever blocked a shortcut — A\*'s clearance was smoothed straight
+    back to `ROBOT_R`, the classic edge-clip. Set the slider to 0.18 to
+    reproduce that old skim behaviour if a path ever needs it.
+  Values apply on the next replan (~0.33 s) and are NOT persisted across
+  restarts — edit the defaults in `tb4_claude_nav.py` once a good working
+  point is found. If clipping persists with generous margins, replay the
+  last drive (`python3 dataset_tools.py datasets/drive_<ts>`): check whether
+  the obstacle was even in `cost_grid` (lidar-plane gaps vs planner gaps).

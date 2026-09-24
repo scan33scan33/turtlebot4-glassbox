@@ -9,10 +9,17 @@
         body { font-family: "Monaco", "Courier", monospace; background: #0a0a0a; color: #ccc; }
         .container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; max-width: 1200px; margin: 0 auto; }
         .panel { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 15px; }
-        .cam-panel { grid-column: 1; display: flex; flex-direction: column; }
-        .lidar-panel { grid-column: 2; grid-row: 1 / 3; }
-        .control-panel { grid-column: 1; }
-        .det-panel { grid-column: 1; }
+        /* Row 1: the two "eyes" side by side. Row 2: act. Row 3: inspect/tune. */
+        .cam-panel { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; }
+        .lidar-panel { grid-column: 2; grid-row: 1; }
+        .task-panel { grid-column: 1; grid-row: 2; }
+        .nav-panel { grid-column: 2; grid-row: 2; }
+        .det-panel { grid-column: 1; grid-row: 3; }
+        .adv-panel { grid-column: 2; grid-row: 3; }
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 8px; max-height: 150px; overflow-y: auto; }
+        .photo-grid a { display: block; cursor: pointer; }
+        .photo-grid img { width: 100%; border: 1px solid #333; border-radius: 3px; }
+        .photo-grid a.latest img { outline: 2px solid #4a9; }
         img { max-width: 100%; height: auto; border-radius: 4px; }
         .stat-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #222; }
         .stat-row span:first-child { color: #888; }
@@ -28,22 +35,47 @@
         button:disabled { opacity: 0.4; cursor: not-allowed; }
         .sep { border: none; border-top: 1px solid #333; margin: 10px 0; }
         .lbl { display: block; margin-top: 10px; color: #888; font-size: 0.9em; }
+        .cfg-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; color: #bbb; }
+        .cfg-row > span:first-child { width: 128px; color: #888; }
+        .cfg-row input[type=range] { flex: 1; accent-color: #4a9; }
+        .cfg-val { width: 52px; text-align: right; font-family: monospace; color: #4a9; }
         #det_list { padding: 10px; background: #0a0a0a; border: 1px solid #222; max-height: 200px; overflow-y: auto; border-radius: 3px; }
         .det-item { padding: 6px; margin: 3px 0; background: #1a1a1a; border-left: 3px solid #4a9; }
         .det-item span { color: #4a9; font-weight: bold; }
-        .status-bar { padding: 10px; background: #1a1a1a; border-top: 1px solid #333; text-align: center; color: #888; }
+        .status-bar { padding: 8px 10px; background: #1a1a1a; border-bottom: 1px solid #333; text-align: center; color: #888; }
+        .status-bar .robot-tag { color:#557; margin-right: 14px; }
         .idle { color: #888; } .navigating { color: #4a9; } .finding { color: #db8; } .arrived { color: #4a9; }
         #lidar-overlay { position: absolute; }
     </style>
 </head>
 <body>
 
+<!-- Hazard + status at the TOP: the things you must never miss. -->
+<div id="hazard_banner" style="display:none; padding:10px; background:#a00; color:#fff; text-align:center; font-weight:bold;"></div>
+<div class="status-bar">
+  <span class="robot-tag">TB4</span> Status: <span id="status" class="idle">idle</span>
+</div>
+
 <div class="container">
+  <!-- Row 1 LEFT: the camera. Feed + shutter together: taking a picture swaps
+       this same image area to the shot (phone-camera style), "back to live" returns. -->
   <div class="cam-panel panel">
-    <div>Camera + YOLO — click an object to drive to it</div>
-    <img id="cam" src="/camera.jpg" alt="camera" onclick="camClick(event)" style="cursor: crosshair;">
+    <div>Camera — click a detected object to drive to it</div>
+    <img id="cam" src="/camera.jpg" alt="camera" onclick="camClick(event)" style="cursor: crosshair; width:100%;">
+    <div id="shot_bar" style="display:none; margin-top:4px; font-size:11px; color:#888;">
+      viewing snapshot <span id="photo_name" style="color:#9c9;"></span>
+      — <a href="#" onclick="backToLive(); return false;" style="color:#4a9;">◀ back to live</a>
+      · <a id="photo_full" href="#" target="_blank" style="color:#4a9;">open full size ↗</a>
+    </div>
+    <div style="margin-top:6px;">
+      <button class="btn" onclick="takePhoto()">📷 Take picture</button>
+      <span id="photo_status" style="margin-left:8px; color:#888; font-size:11px;"></span>
+    </div>
+    <div id="photo_empty" style="font-size:11px; color:#666; margin-top:6px;">No pictures yet — 📷 saves the frame WITH the YOLO overlay (exactly what the robot saw).</div>
+    <div id="photo_gallery" class="photo-grid"></div>
   </div>
 
+  <!-- Row 1 RIGHT: the lidar BEV. -->
   <div class="lidar-panel panel">
     <div>Lidar BEV (click to navigate)</div>
     <div style="position: relative; display: inline-block; width: 100%;">
@@ -55,9 +87,28 @@
     <div class="stat-row"><span>Ball goal</span><span id="ballgoal_disp" style="color:#fc3;">—</span></div>
   </div>
 
-  <div class="control-panel panel">
+  <!-- Row 2 LEFT: tell the robot what to do. -->
+  <div class="task-panel panel">
+    <div class="lbl" style="margin-top:0;">Task (ToyScript) — say what you want</div>
+    <input type="text" id="task_input" placeholder="clean up the toys, find the bottle, go home…"
+           onkeydown="if(event.key==='Enter') runTask()">
+    <button class="btn" onclick="runTask()">▶ Run task</button>
+    <button class="btn" onclick="stopTask()" style="background:#a44;">■ Stop task</button>
+    <div id="run_status" style="margin-top:6px; font-family:monospace; font-size:11px; color:#9c9; white-space:pre-wrap;"></div>
+    <div id="reasoning" style="margin-top:10px; display:none; background:#0f1710; border:1px solid #2a3a2a; border-radius:5px; padding:10px 12px;">
+      <div style="color:#8d8; font-size:10px; letter-spacing:1.5px; font-weight:bold;">REASONING</div>
+      <div id="rz_cmd" style="font-family:monospace; font-size:14px; color:#dfe8ff; margin-top:5px;"></div>
+      <div id="rz_intent" style="font-size:11px; color:#9c9; margin:5px 0 9px;"></div>
+      <div id="rz_plan" style="font-size:12.5px; line-height:1.85; font-family:monospace;"></div>
+    </div>
+    <div class="lbl" style="margin-top:8px;">Commands (last 5)</div>
+    <div id="cmd_history" style="font-family:monospace; font-size:11px; line-height:1.6;"></div>
+  </div>
+
+  <!-- Row 2 RIGHT: drive it / dock it. -->
+  <div class="nav-panel panel">
     <div class="stat-row"><span>Pos X</span><span id="rx">0.000</span></div>
-    <div class="stat-row"><span>Pos Y</span><span id="ry">0.000</span></div>
+    <div class="stat-row"><span>Pos Y</span><span id="ry2">0.000</span></div>
     <div class="stat-row"><span>Yaw</span><span id="ryaw">0.0°</span></div>
     <div class="battery" id="battery"><strong>Battery:</strong> <span id="batt_pct">—</span>% | <span id="batt_volt">—</span>V</div>
     <div class="stat-row"><span>Dock</span><span id="dock_disp">—</span></div>
@@ -78,56 +129,64 @@
       Then run task: <i>“push the ball to the goal”</i>.
     </div>
     <button class="btn" onclick="clearBallGoal()" style="background:#555; color:#ddd;">Clear ball goal</button>
+  </div>
+
+  <!-- Row 3 LEFT: what the robot recognises. -->
+  <div class="det-panel panel">
+    <div>Detections</div>
+    <div id="det_list">none</div>
+    <div id="match_info" class="lbl"></div>
+  </div>
+
+  <!-- Row 3 RIGHT: knobs you touch rarely. -->
+  <div class="adv-panel panel">
+    <div class="lbl" style="margin-top:0;">Tuning</div>
     <label class="lbl" style="display:block; margin:4px 0;">
       <input type="checkbox" id="lidar_dist" onchange="toggleLidarDist()"> Smart distance (depth p25 over the box)
     </label>
     <hr class="sep">
-    <div class="lbl">Task (ToyScript) — say what you want</div>
-    <input type="text" id="task_input" placeholder="clean up the toys, find the bottle, go home…"
-           onkeydown="if(event.key==='Enter') runTask()">
-    <button class="btn" onclick="runTask()">▶ Run task</button>
-    <button class="btn" onclick="stopTask()" style="background:#a44;">■ Stop task</button>
-    <div id="run_status" style="margin-top:6px; font-family:monospace; font-size:11px; color:#9c9; white-space:pre-wrap;"></div>
-    <div id="reasoning" style="margin-top:10px; display:none; background:#0f1710; border:1px solid #2a3a2a; border-radius:5px; padding:10px 12px;">
-      <div style="color:#8d8; font-size:10px; letter-spacing:1.5px; font-weight:bold;">REASONING</div>
-      <div id="rz_cmd" style="font-family:monospace; font-size:14px; color:#dfe8ff; margin-top:5px;"></div>
-      <div id="rz_intent" style="font-size:11px; color:#9c9; margin:5px 0 9px;"></div>
-      <div id="rz_plan" style="font-size:12.5px; line-height:1.85; font-family:monospace;"></div>
+    <div class="lbl">Planner margins <span style="color:#555;">(live — apply on next replan)</span></div>
+    <div class="cfg-row">
+      <span>Soft cushion</span>
+      <input type="range" id="cfg_inflate" min="0.20" max="0.60" step="0.05" oninput="cfgChanged()">
+      <span class="cfg-val" id="cfg_inflate_v">—</span>
     </div>
-    <div class="lbl" style="margin-top:8px;">Commands (last 5)</div>
-    <div id="cmd_history" style="font-family:monospace; font-size:11px; line-height:1.6;"></div>
+    <div class="cfg-row">
+      <span>Smoother clearance</span>
+      <input type="range" id="cfg_smooth" min="0.18" max="0.60" step="0.01" oninput="cfgChanged()">
+      <span class="cfg-val" id="cfg_smooth_v">—</span>
+    </div>
+    <div style="font-size:11px; color:#777; margin:0 0 4px;">
+      Soft cushion = how far out A* starts avoiding walls (higher → keeps more distance,
+      still fits doorways; robot radius stays 0.18 m).
+      Smoother clearance = the path-straightener may not pull a shortcut closer than this
+      to an obstacle (set to 0.18 = off / old skim behaviour; ≥ cushion = stay fully clear).
+    </div>
     <hr class="sep">
     <div class="lbl">Dataset recording</div>
     <button class="btn" id="rec_btn" onclick="toggleRecord()">● Start Recording</button>
     <span id="rec_status" style="margin-left:8px; color:#888;"></span>
-    <hr class="sep">
-    <div class="lbl" id="match_info"></div>
   </div>
-
-  <div class="det-panel panel">
-    <div>Detections</div>
-    <div id="det_list">none</div>
-  </div>
-</div>
-
-<div id="hazard_banner" style="display:none; padding:10px; background:#a00; color:#fff; text-align:center; font-weight:bold;"></div>
-<div class="status-bar">
-  Status: <span id="status" class="idle">idle</span>
 </div>
 
 <script>
 let lastState = {odom_x:0, odom_y:0, odom_yaw:0};
 const IMG_REFRESH_MS = 500;
+// The camera area doubles as the snapshot viewer: while _camLive is false it
+// shows a saved picture and the refresh below leaves it alone (backToLive()
+// restores the feed). The lidar BEV always refreshes.
+let _camLive = true;
 
 function update() {
   // Refresh the live images FIRST, independent of the /state panel — a render
   // error (or a slow/failed /state) must never be able to freeze the feed.
-  document.getElementById('cam').src = '/camera.jpg?t=' + Date.now();
+  if (_camLive) document.getElementById('cam').src = '/camera.jpg?t=' + Date.now();
   document.getElementById('lidar').src = '/lidar.png?t=' + Date.now();
   fetch('/state?t=' + Date.now(), {cache:'no-store'}).then(r=>r.json()).then(s=>{
     lastState = s;
     document.getElementById('rx').textContent = s.odom_x.toFixed(3);
     document.getElementById('ry').textContent = s.odom_y.toFixed(3);
+    document.getElementById('ry2').textContent = s.odom_y.toFixed(3);
     document.getElementById('ryaw').textContent = s.odom_yaw.toFixed(1);
     document.getElementById('goal_disp').textContent = s.goal_odom ? `(${s.goal_odom[0].toFixed(2)}, ${s.goal_odom[1].toFixed(2)})` : '—';
     document.getElementById('ballgoal_disp').textContent = s.ball_goal ? `(${s.ball_goal[0].toFixed(2)}, ${s.ball_goal[1].toFixed(2)})` : '—';
@@ -167,6 +226,10 @@ function update() {
     }
     const ldc = document.getElementById('lidar_dist');
     if (ldc && document.activeElement !== ldc) ldc.checked = !!s.use_lidar_dist;
+    if (s.planner) syncPlannerCfg(s.planner);
+    // A new snapshot (button here, PHOTO() in a program, another browser):
+    // show it in the camera area and refresh the gallery — once per filename.
+    if (s.last_photo && s.last_photo !== _shownPhoto) { _shownPhoto = s.last_photo; selectPhoto(s.last_photo); loadPhotos(); }
     const hb = document.getElementById('hazard_banner');
     if (s.hazards && s.hazards.length) {
       hb.textContent = '⚠ ' + s.hazards.map(h => h.where ? `${h.type} (${h.where})` : h.type).join(', ').toUpperCase();
@@ -178,7 +241,7 @@ function update() {
     if (rstat) {
       if (s.run_active || (s.run_log && s.run_log.length)) {
         const head = (s.run_active ? '▶ ' : '✓ ') + (s.run_program||'') + (s.run_error ? '  ERROR: '+s.run_error : '');
-        rstat.textContent = head + '\\n' + (s.run_log||[]).slice(-8).join('\\n');
+        rstat.textContent = head + '\n' + (s.run_log||[]).slice(-8).join('\n');
       } else { rstat.textContent = ''; }
     }
     // Reasoning: plain-language command -> matched skill -> plan, live step lit up
@@ -230,6 +293,29 @@ function toggleLidarDist() {
   fetch('/lidar_dist', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({on})});
 }
 
+// Planner-margin sliders: labels update live, POST is debounced while dragging.
+// /state carries the same values (syncPlannerCfg) so another client's change
+// shows up here — unless the user is actively dragging that slider.
+let _cfgTimer = null;
+function _cfgFmt(id, v) { document.getElementById(id).textContent = Number(v).toFixed(2) + ' m'; }
+function syncPlannerCfg(p) {
+  const ci = document.getElementById('cfg_inflate'), cs = document.getElementById('cfg_smooth');
+  if (ci && document.activeElement !== ci) ci.value = p.inflate_r;
+  if (cs && document.activeElement !== cs) cs.value = p.smooth_clear_m;
+  if (ci) _cfgFmt('cfg_inflate_v', ci.value);
+  if (cs) _cfgFmt('cfg_smooth_v', cs.value);
+}
+function cfgChanged() {
+  const inflate = parseFloat(document.getElementById('cfg_inflate').value);
+  const smooth  = parseFloat(document.getElementById('cfg_smooth').value);
+  _cfgFmt('cfg_inflate_v', inflate); _cfgFmt('cfg_smooth_v', smooth);
+  clearTimeout(_cfgTimer);
+  _cfgTimer = setTimeout(() => {
+    fetch('/planner_cfg', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({inflate_r: inflate, smooth_clear_m: smooth})});
+  }, 150);
+}
+
 const _LV = 400, _LS = _LV / (120 * 0.05);
 function lidarClick(e) {
   const rect = e.currentTarget.getBoundingClientRect();
@@ -252,6 +338,9 @@ function clearBallGoal() {
 
 document.getElementById('lidar').addEventListener('click', lidarClick);
 function camClick(e) {
+  // Viewing a snapshot? A click must never drive the robot somewhere a frozen
+  // frame suggests — it just returns to the live feed instead.
+  if (!_camLive) { backToLive(); return; }
   // click a detected object in the camera to drive to it (no typing)
   const rect = e.currentTarget.getBoundingClientRect();
   const cx = (e.clientX - rect.left) * (416 / rect.width);   // -> 416 preview coords
@@ -284,6 +373,50 @@ function runTask() {
     });
 }
 function stopTask() { fetch('/run_stop', {method:'POST'}); }
+
+// ── Snapshots: the camera area is the viewer (live ⇄ shot) ──
+let _shownPhoto = null;   // newest name seen via /state (poll guard)
+let _selPhoto = null;     // highlighted/selected picture (shown when not live)
+function selectPhoto(name) {
+  _selPhoto = name;
+  _camLive = false;                                                    // pause the feed refresh
+  const cam = document.getElementById('cam');
+  cam.src = '/photos/' + name;
+  cam.style.cursor = 'zoom-out';
+  document.getElementById('photo_name').textContent = name;
+  document.getElementById('photo_full').href = '/photos/' + name;
+  document.getElementById('shot_bar').style.display = 'block';
+  loadPhotos();                                                        // re-highlight the thumbs
+}
+function backToLive() {
+  _camLive = true;                                                     // next tick redraws the feed
+  document.getElementById('cam').style.cursor = 'crosshair';
+  document.getElementById('shot_bar').style.display = 'none';
+}
+function takePhoto() {
+  const st = document.getElementById('photo_status');
+  st.textContent = '…';
+  fetch('/photo', {method:'POST'}).then(r => r.json()).then(j => {
+    if (!j.ok) { st.textContent = '⚠ ' + (j.error || 'failed'); return; }
+    _shownPhoto = j.name;
+    st.textContent = '📷 ' + j.name + (j.stale ? '  ⚠ camera frame was stale (>3 s old)' : '');
+    selectPhoto(j.name);            // show the new picture right away
+  }).catch(() => { st.textContent = '⚠ request failed'; });
+}
+function loadPhotos() {
+  fetch('/photos').then(r => r.json()).then(j => {
+    const names = j.photos || [];
+    document.getElementById('photo_empty').style.display = names.length ? 'none' : 'block';
+    if (!_selPhoto || names.indexOf(_selPhoto) < 0) _selPhoto = names[0] || null;
+    document.getElementById('photo_gallery').innerHTML = names.map(function(n) {
+      return '<a href="/photos/' + n + '" title="' + n + '"' +
+             ' onclick="selectPhoto(\'' + n + '\'); return false;"' +
+             (n === _selPhoto ? ' class="latest"' : '') +
+             '><img loading="lazy" src="/photos/' + n + '" alt="' + n + '"></a>';
+    }).join('');
+  }).catch(() => {});
+}
+loadPhotos();
 function _mode() { return document.getElementById('push_mode').checked ? 'push' : 'move'; }
 function _ballGoalMode() { const e = document.getElementById('ball_goal_mode'); return !!(e && e.checked); }
 </script>
