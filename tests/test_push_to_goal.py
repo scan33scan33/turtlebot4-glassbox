@@ -87,6 +87,21 @@ _stub_modules()
 import tb4_claude_nav as tb4                                    # noqa: E402
 
 
+def clear_scan(obstacle=None):
+    """360° RPLIDAR scan; an optional obstacle is specified in base_link x/y."""
+    inc = 2 * math.pi / 360
+    ranges = [4.0] * 360
+    if obstacle is not None:
+        x, y = obstacle
+        # base_x=-r*sin(lidar_angle), base_y=r*cos(lidar_angle)
+        angle = math.atan2(-x, y)
+        i = round((angle + math.pi) / inc) % 360
+        ranges[i] = math.hypot(x, y)
+    return types.SimpleNamespace(ranges=ranges, angle_min=-math.pi,
+                                 angle_increment=inc, range_min=0.12,
+                                 range_max=8.0)
+
+
 # ── Fake base + world ─────────────────────────────────────────────────────────
 class FakeBase:
     """NavNode stand-in that also runs the world: integrates the commanded twist
@@ -97,16 +112,18 @@ class FakeBase:
     FOV_HALF = 0.58          # rad — OAK-D 416 preview is ~65 deg across
     CONTACT = 0.30           # m — robot centre to ball centre while pushing
 
-    def __init__(self, ball, pose=(0.0, 0.0, 0.0), rate=100.0):
+    def __init__(self, ball, pose=(0.0, 0.0, 0.0), rate=100.0, scan=None):
         self.ball = [float(ball[0]), float(ball[1])]
         self.rate = rate
+        self.scan = scan
         self._v = self._w = 0.0
         self._stop = threading.Event()
         self.twists = []
         self.max_ball_goal_dist = 0.0
         self.ball_track = []
         tb4._set(odom_x=pose[0], odom_y=pose[1], odom_yaw=pose[2],
-                 odom_t=time.time(), scan=None, scan_t=0.0, detections=[],
+                 odom_t=time.time(), scan=scan, scan_t=time.time() if scan else 0.0,
+                 docked=False, detections=[],
                  hazards=[], nav_active=False, goal_odom=None, goal_mode='move',
                  goal_local=None, look_local=None, path=[], status='idle',
                  ball_mark=None, push_from=None,
@@ -200,7 +217,10 @@ class FakeBase:
         while not self._stop.is_set():
             time.sleep(tick)
             now = time.time()
-            dt = min(0.05, max(0.0, now - last))
+            # A busy CI host can delay this thread >50 ms. Discarding most of
+            # that elapsed time makes the fake ball crawl and spuriously trips
+            # the real controller's stall/segment timers; bound only big pauses.
+            dt = min(0.20, max(0.0, now - last))
             last = now
             x, y, yaw = tb4._get('odom_x'), tb4._get('odom_y'), tb4._get('odom_yaw')
             v, w = self._v, self._w
@@ -209,15 +229,19 @@ class FakeBase:
             ny = y + v * math.sin(yaw) * dt
             bx, by = self.ball
             d = math.hypot(nx - bx, ny - by)
-            if d < self.CONTACT and v > 0.0:
-                # contact push: clamp the robot at the ball and roll the ball by
-                # however far the robot actually travelled
-                ux, uy = (nx - bx) / d, (ny - by) / d
-                nx, ny = bx + ux * self.CONTACT, by + uy * self.CONTACT
-                step = math.hypot(nx - x, ny - y)
-                self.ball = [bx - ux * step, by - uy * step]
+            if d < self.CONTACT and v > 0.0 and d < math.hypot(x - bx, y - by):
+                # Resolve the overlap by moving the BALL away from the robot's
+                # proposed pose. Clamping the robot to the OLD ball position
+                # (as this fake used to do) pins it exactly at contact: next
+                # tick its movement is undone and the ball never advances.
+                ux, uy = ((bx - nx) / d, (by - ny) / d) if d > 1e-6 else \
+                         (math.cos(yaw), math.sin(yaw))
+                overlap = self.CONTACT - d
+                self.ball = [bx + ux * overlap, by + uy * overlap]
                 self.ball_track.append(tuple(self.ball))
             tb4._set(odom_x=nx, odom_y=ny, odom_yaw=yaw, odom_t=time.time())
+            if self.scan is not None:
+                tb4._set(scan=self.scan, scan_t=time.time())
             self._publish_ball()
             self._serve_nav()
 
@@ -292,6 +316,28 @@ class TestPushGeometry(unittest.TestCase):
             self.assertAlmostEqual(bx, lx, places=9)
             self.assertAlmostEqual(by, ly, places=9)
 
+    def test_rear_clearance_uses_the_rotated_lidar_frame(self):
+        self.assertTrue(tb4._rear_path_clear(clear_scan(), 0.7))
+        # In lidar coordinates +pi/2 points BEHIND the robot, not to its left.
+        self.assertFalse(tb4._rear_path_clear(clear_scan((-0.5, 0.0)), 0.7))
+        self.assertFalse(tb4._rear_path_clear(clear_scan((-0.5, 0.25)), 0.7))
+        self.assertTrue(tb4._rear_path_clear(clear_scan((-0.5, 0.6)), 0.7))
+
+    def test_reverse_needs_a_valid_360_degree_rear_scan(self):
+        self.assertFalse(tb4._rear_path_clear(None, 0.7))
+        partial = clear_scan()
+        partial.ranges = partial.ranges[:180]
+        self.assertFalse(tb4._rear_path_clear(partial, 0.7))
+        invalid = clear_scan()
+        invalid.ranges[270] = float('nan')
+        self.assertFalse(tb4._rear_path_clear(invalid, 0.7))
+        no_returns = clear_scan()
+        no_returns.ranges = [float('inf')] * 360
+        self.assertFalse(tb4._rear_path_clear(no_returns, 0.7))
+        too_near = clear_scan()
+        too_near.ranges[270] = 0.0
+        self.assertFalse(tb4._rear_path_clear(too_near, 0.7))
+
 
 class TestPushToGoal(unittest.TestCase):
     """Closed-loop: the real NavRobot.push_to_goal driving the fake base."""
@@ -314,6 +360,113 @@ class TestPushToGoal(unittest.TestCase):
             self.assertLessEqual(base.ball_dist_to(goal), tb4.PUSH_GOAL_DONE)
             self.assertEqual(tb4._get('ball_goal'), goal)
 
+    def test_backs_up_when_close_behind_then_pushes_forward(self):
+        goal = (1.55, 0.0)
+        # 0.34 m behind: too little room to dock straight on the push line.
+        # Keep the goal close so this test probes repositioning, not the
+        # unrelated 25-second shove limit when the fake base is CPU-starved.
+        with FakeBase((1.0, 0.0), pose=(0.66, 0.0, 0.0), scan=clear_scan()) as base:
+            res = self._robot().push_to_goal(*goal, max_time=60)
+            self.assertEqual(res, 'at goal')
+            self.assertTrue(any(v < 0 for v, _ in base.twists))
+            self.assertTrue(any(v > 0 for v, _ in base.twists))
+            self.assertLessEqual(base.ball_dist_to(goal), tb4.PUSH_GOAL_DONE)
+            self.assertGreaterEqual(min(b[0] for b in base.ball_track), 0.95)
+
+    def test_reverse_is_only_for_close_aligned_repositioning(self):
+        ball, goal = (1.0, 0.0), (1.9, 0.0)
+        for pose in ((1.4, 0.0, math.pi),   # ahead of the ball
+                     (1.0, 0.4, 0.0),      # abreast
+                     (0.65, 0.4, 0.0),     # off the push line
+                     (0.65, 0.0, 0.5),     # heading across the line
+                     (-0.6, 0.0, 0.0)):   # already far behind
+            with self.subTest(pose=pose):
+                with FakeBase(ball, pose=pose, scan=clear_scan()) as base:
+                    self.assertEqual(self._robot()._back_off_for_push(ball, goal), 'skip')
+                    self.assertFalse(any(v < 0 for v, _ in base.twists))
+
+    def test_blocked_or_stale_rear_scan_never_starts_reverse(self):
+        ball, goal = (1.0, 0.0), (1.9, 0.0)
+        for scan in (clear_scan((-0.5, 0.0)), None):
+            with self.subTest(scan=scan):
+                with FakeBase(ball, pose=(0.66, 0.0, 0.0), scan=scan) as base:
+                    self.assertEqual(self._robot()._back_off_for_push(ball, goal), 'skip')
+                    self.assertFalse(any(v < 0 for v, _ in base.twists))
+        with FakeBase(ball, pose=(0.66, 0.0, 0.0)) as base:
+            tb4._set(scan=clear_scan(), scan_t=time.time() - 3.0)
+            self.assertEqual(self._robot()._back_off_for_push(ball, goal), 'skip')
+            self.assertFalse(any(v < 0 for v, _ in base.twists))
+
+    def test_cliff_during_reverse_stops_and_blocks_the_task(self):
+        class CliffBase(FakeBase):
+            def send_twist(self, linear, angular):
+                super().send_twist(linear, angular)
+                if linear < 0:
+                    tb4._set(hazards=[{'type': 'cliff'}])
+
+        with CliffBase((1.0, 0.0), pose=(0.66, 0.0, 0.0), scan=clear_scan()) as base:
+            res = self._robot().push_to_goal(1.9, 0.0, max_time=20)
+            self.assertEqual(res, 'blocked')
+            self.assertTrue(any(v < 0 for v, _ in base.twists))
+            self.assertEqual(base.twists[-1], (0.0, 0.0))
+            self.assertAlmostEqual(base.ball[0], 1.0)
+
+    def test_lost_lidar_during_reverse_stops(self):
+        class StaleBase(FakeBase):
+            def send_twist(self, linear, angular):
+                super().send_twist(linear, angular)
+                if linear < 0:
+                    self.scan = None
+                    tb4._set(scan_t=time.time() - 3.0)
+
+        with StaleBase((1.0, 0.0), pose=(0.66, 0.0, 0.0), scan=clear_scan()) as base:
+            self.assertEqual(self._robot()._back_off_for_push((1.0, 0.0), (1.9, 0.0)),
+                             'blocked')
+            self.assertTrue(any(v < 0 for v, _ in base.twists))
+            self.assertEqual(base.twists[-1], (0.0, 0.0))
+
+    def test_new_obstacle_during_reverse_stops(self):
+        class ObstacleBase(FakeBase):
+            def send_twist(self, linear, angular):
+                super().send_twist(linear, angular)
+                if linear < 0:
+                    self.scan = clear_scan((-0.4, 0.0))
+                    tb4._set(scan=self.scan, scan_t=time.time())
+
+        with ObstacleBase((1.0, 0.0), pose=(0.66, 0.0, 0.0), scan=clear_scan()) as base:
+            self.assertEqual(self._robot()._back_off_for_push((1.0, 0.0), (1.9, 0.0)),
+                             'blocked')
+            self.assertTrue(any(v < 0 for v, _ in base.twists))
+            self.assertEqual(base.twists[-1], (0.0, 0.0))
+
+    def test_abort_during_reverse_stops_the_base(self):
+        robot = self._robot()
+
+        class AbortBase(FakeBase):
+            def send_twist(self, linear, angular):
+                super().send_twist(linear, angular)
+                if linear < 0:
+                    robot.abort()
+
+        with AbortBase((1.0, 0.0), pose=(0.66, 0.0, 0.0), scan=clear_scan()) as base:
+            with self.assertRaises(tb4.toyscript.StopProgram):
+                robot._back_off_for_push((1.0, 0.0), (1.9, 0.0))
+            self.assertTrue(any(v < 0 for v, _ in base.twists))
+            self.assertEqual(base.twists[-1], (0.0, 0.0))
+
+    def test_reverse_stall_stops_if_base_cannot_move_backward(self):
+        class StuckBase(FakeBase):
+            def send_twist(self, linear, angular):
+                super().send_twist(linear, angular)
+                if linear < 0:
+                    self._v = 0.0            # Create 3 ignored the reverse command
+
+        with StuckBase((1.0, 0.0), pose=(0.66, 0.0, 0.0), scan=clear_scan()) as base:
+            self.assertEqual(self._robot()._back_off_for_push((1.0, 0.0), (1.9, 0.0)),
+                             'blocked')
+            self.assertIn('stalled', tb4._get('status'))
+            self.assertEqual(base.twists[-1], (0.0, 0.0))
+
     def test_lines_up_first_when_the_robot_is_off_the_line(self):
         """Robot starts 0.8 m to the side: it must drive to the stance point
         BEHIND the ball (go_to) before shoving, and still deliver the ball."""
@@ -327,12 +480,13 @@ class TestPushToGoal(unittest.TestCase):
         """Robot starts abreast of the ball (level with it, not behind). It must
         back off and line up rather than push the ball the wrong way."""
         goal = (2.5, 0.0)
-        with FakeBase((1.0, 0.0), pose=(1.0, -1.0, 0.0)) as base:
+        with FakeBase((1.0, 0.0), pose=(1.0, -1.0, 0.0), scan=clear_scan()) as base:
             start = base.ball_dist_to(goal)
             res = self._robot().push_to_goal(goal[0], goal[1], max_time=90)
             end = base.ball_dist_to(goal)
             self.assertEqual(res, 'at goal')
             self.assertLess(end, start)
+            self.assertFalse(any(v < 0 for v, _ in base.twists))
             # the ball never got meaningfully farther from the goal than it started
             worst = max([start] + [math.hypot(b[0] - goal[0], b[1] - goal[1])
                                    for b in base.ball_track])

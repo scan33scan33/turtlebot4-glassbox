@@ -5,10 +5,11 @@
 #
 # The goal is the point a HUMAN marked: tick the Ball-goal box in the web UI and
 # click the BEV (or POST /set_ball_goal). Each round the robot finds the ball,
-# marks it, drives to the point BEHIND it on the goal-ball line, squares up, and
-# shoves - then re-measures and repeats. A crooked shove is therefore corrected
-# by the next round instead of compounding, which is what makes it converge on
-# the goal. Hard-code a goal in odom metres with PUSH_TO_GOAL(x, y) instead.
+# marks it, drives to the point BEHIND it on the goal-ball line (or briefly
+# backs up if already behind it and the rear lidar path is clear), squares up,
+# and shoves FORWARD - then re-measures and repeats. A crooked shove is corrected
+# by the next round instead of compounding. Hard-code a goal in odom metres with
+# PUSH_TO_GOAL(x, y) instead.
 
 SET ball = SCAN_FOR("ball", 360)
 IF ball != NONE THEN

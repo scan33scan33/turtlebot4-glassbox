@@ -100,6 +100,16 @@ PUSH_DOCK_V      = 0.25   # m/s — fastest the dock creeps (scaled down near th
 PROG_M          = 0.010   # m of odom travel that counts as progress (see _push_segment)
 PUSH_GOAL_ALIGN = 0.12    # rad — heading error tolerated before starting a push
 PUSH_SEG_TIME   = 25.0    # s — one push segment, then re-find & re-line-up
+# Only when already behind the ball and facing the goal: back straight away to
+# regain docking room without turning the camera away from the ball. The shove
+# itself is ALWAYS forward. Uncertain geometry/lidar -> use the normal planner.
+PUSH_BACK_V       = 0.12  # m/s (slow reverse)
+PUSH_BACK_MAX     = 0.90  # m per manoeuvre
+PUSH_BACK_LAT     = 0.12  # m — must be near the push line before reversing
+PUSH_BACK_HEADING = 0.18  # rad — must be facing ball -> goal
+PUSH_BACK_CLEAR   = 0.30  # m obstacle clearance along the rear path
+PUSH_BACK_MARGIN  = 0.12  # m extra clear path beyond the stopping point
+PUSH_BACK_SCAN_AGE = 1.0  # s — refuse to reverse on old lidar or odometry
 FOLLOW_STANDOFF = 1.0     # m — never approach a person closer than this
 FOLLOW_STANDOFF_CLOSE = 0.7  # m — for the small/low targets in _FOLLOW_CLOSE: at 1 m
                              #     the 416-px preview loses them (see _follow_params)
@@ -420,6 +430,47 @@ def smooth_path(grid: np.ndarray, path: list) -> list:
         out.append(path[j])
         i = j
     return out
+
+
+def _rear_path_clear(scan, distance):
+    """Is a straight reverse of `distance` safe in the current 360° lidar grid?
+
+    The grid's row axis is base_link +x (forward), so reversing follows rows
+    BELOW the centre. Use the same obstacle inflation as navigation, with a
+    stricter clearance and a little room beyond the destination. Never treat an
+    unobserved/invalid rear sector as empty space (build_grid normally does).
+    """
+    if scan is None or len(scan.ranges) == 0 or distance <= 0 or distance > PUSH_BACK_MAX:
+        return False
+    n = len(scan.ranges)
+    clearance = max(PUSH_BACK_CLEAR, SMOOTH_CLEAR_M)
+    if (n < 90 or not math.isfinite(scan.angle_min) or
+            not math.isfinite(scan.angle_increment) or scan.angle_increment == 0 or
+            not math.isfinite(scan.range_min) or not math.isfinite(scan.range_max) or
+            scan.range_min < 0 or scan.range_min >= scan.range_max or
+            scan.range_max < distance + PUSH_BACK_MARGIN + clearance or
+            (n - 1) * abs(scan.angle_increment) < 2 * math.pi - 0.35):
+        return False
+    # RPLIDAR is mounted +90°: angle +pi/2 points directly behind base_link.
+    angles = scan.angle_min + np.arange(n) * scan.angle_increment
+    rear = np.sin(angles) > 0.5           # rear-facing 120° sector
+    all_ranges = np.asarray(scan.ranges)
+    # A fresh scan filled entirely with 'no return' can also mean a dead lidar.
+    if not np.any(np.isfinite(all_ranges) & (all_ranges >= scan.range_min) &
+                  (all_ranges <= scan.range_max)):
+        return False
+    ranges = all_ranges[rear]
+    if len(ranges) < 10 or not np.all(
+            np.isposinf(ranges) |
+            (np.isfinite(ranges) & (ranges >= max(0.12, scan.range_min)) &
+             (ranges <= scan.range_max))):
+        return False
+    half = GRID_CELLS // 2
+    steps = int(math.ceil((distance + PUSH_BACK_MARGIN) / GRID_RES))
+    if steps >= half:
+        return False
+    return _line_of_sight(build_grid(scan), (half, half), (half - steps, half),
+                          _soft_cost_at(clearance))
 
 
 # ── Lidar visualisation ───────────────────────────────────────────────────────
@@ -1743,6 +1794,73 @@ class NavRobot:
         ros_node.send_twist(0.0, 0.0)
         time.sleep(0.3)                            # let the base settle first
 
+    def _back_off_for_push(self, ball, goal):
+        """Back away to the approach stance *only* from close behind the ball.
+
+        This keeps the forward camera pointed at the ball between shoves instead
+        of rotating 180° twice for a short retreat. It is not a rearward push:
+        if we're beside/ahead of the ball, off line, or facing the wrong way,
+        the normal obstacle-aware go_to must route us around it instead.
+        Returns 'backed', 'skip' (use go_to), or 'blocked' (stop this task).
+        """
+        if not ros_node:
+            return 'blocked'
+        ox, oy, yaw = _get('odom_x'), _get('odom_y'), _get('odom_yaw')
+        along, lat, _ = stance_error((ox, oy), ball, goal)
+        heading = _wrap_angle(math.atan2(goal[1] - ball[1], goal[0] - ball[0]) - yaw)
+        distance = PUSH_APPROACH + along
+        if (not (ROBOT_R + 0.10 <= -along < PUSH_DOCK_ROOM) or
+                lat > PUSH_BACK_LAT or abs(heading) > PUSH_BACK_HEADING or
+                not (0 < distance <= PUSH_BACK_MAX)):
+            return 'skip'
+        now = time.time()
+        scan = _get('scan')
+        if (now - _get('scan_t') > PUSH_BACK_SCAN_AGE or
+                now - _get('odom_t') > PUSH_BACK_SCAN_AGE or
+                not _rear_path_clear(scan, distance)):
+            return 'skip'                    # don't reverse blind; planner can route
+
+        t0 = last_prog = now
+        prog_x, prog_y = ox, oy
+        try:
+            while True:
+                self._check()
+                now = time.time()
+                if _get('docked') is True or any(
+                        h['type'] in ('bump', 'cliff', 'wheel_drop', 'stall')
+                        for h in _get('hazards')):
+                    _set(status='reverse interrupted: hazard — stopped')
+                    return 'blocked'
+                if (now - _get('scan_t') > PUSH_BACK_SCAN_AGE or
+                        now - _get('odom_t') > PUSH_BACK_SCAN_AGE):
+                    _set(status='reverse interrupted: lidar/odom stale — stopped')
+                    return 'blocked'
+                ox, oy, yaw = _get('odom_x'), _get('odom_y'), _get('odom_yaw')
+                along, lat, _ = stance_error((ox, oy), ball, goal)
+                remaining = PUSH_APPROACH + along
+                heading = _wrap_angle(math.atan2(goal[1] - ball[1], goal[0] - ball[0]) - yaw)
+                if remaining <= 0.04:
+                    return 'backed'
+                if (lat > PUSH_ALIGN_LAT or abs(heading) > PUSH_BACK_HEADING or
+                        -along < ROBOT_R + 0.10 or
+                        distance - remaining > PUSH_BACK_MAX + 0.05 or
+                        now - t0 > distance / PUSH_BACK_V + 2.0):
+                    _set(status='reverse interrupted: off line or timed out — stopped')
+                    return 'blocked'
+                if not _rear_path_clear(_get('scan'), remaining):
+                    _set(status='reverse interrupted: rear path blocked — stopped')
+                    return 'blocked'
+                if math.hypot(ox - prog_x, oy - prog_y) > PROG_M:
+                    last_prog = now; prog_x, prog_y = ox, oy
+                elif now - last_prog > STALL_TIMEOUT:
+                    _set(status='reverse stalled — stopped')
+                    return 'blocked'
+                ros_node.send_twist(-PUSH_BACK_V, 0.0)
+                _set(status='backing away from ball (%.2fm to stance)' % remaining)
+                time.sleep(0.08)
+        finally:
+            ros_node.send_twist(0.0, 0.0)
+
     def _dock_on_line(self, ball, goal, stop_dist=PUSH_DOCK_STOP, max_time=20.0):
         """Final approach: creep forward ALONG the push line, servoing the robot's
         lateral offset out, and stop just short of the ball.
@@ -1871,11 +1989,11 @@ class NavRobot:
         """Push `name` to a goal a HUMAN set — the (gx, gy) arguments, or the
         point marked in the UI (state 'ball_goal') when called with none.
 
-        Each round: find + mark the ball → if the robot is not behind it on the
-        goal↔ball line, let the planner drive it there → dock the last metre
-        ALONG the line → shove → re-measure → repeat. Re-aiming from a fresh fix
-        every round is what makes it converge: a crooked shove is corrected by the
-        next one instead of compounding.
+        Each round: find + mark the ball → back up briefly if already behind it
+        but too close, otherwise let the planner drive around to the stance →
+        dock the last metre ALONG the line → shove forward → re-measure → repeat.
+        Re-aiming from a fresh fix every round is what makes it converge: a
+        crooked shove is corrected by the next one instead of compounding.
         Returns 'at goal' / 'stalled' / 'lost' / 'blocked' / 'no-goal' / 'timeout'."""
         if not ros_node: return 'no-robot'
         if gx is not None and gy is not None:
@@ -1906,10 +2024,19 @@ class NavRobot:
             stance = push_stance(ball, goal)
             _set(push_from=stance)
             along, lat, _ = stance_error((_get('odom_x'), _get('odom_y')), ball, goal)
+            if -along < PUSH_DOCK_ROOM:
+                back = self._back_off_for_push(ball, goal)
+                if back == 'blocked':
+                    return 'blocked'
+                if back == 'backed':
+                    # Re-find the ball from the new pose before docking; never
+                    # assume it stayed put while we were backing away.
+                    repositioned = True; blocks = 0
+                    continue
             if along > -PUSH_ALIGN_BACK:
                 # Abreast of / ahead of / on top of the ball: NEVER shove from
-                # here (it would go the wrong way). Back off well behind it.
-                _set(status='not behind the ball — backing off to line up')
+                # here (it would go the wrong way). Route around to get behind.
+                _set(status='not behind the ball — navigating to line up')
                 r = self.go_to(*push_stance(ball, goal, PUSH_APPROACH))
                 repositioned = False; blocks += 1
                 if r not in ('arrived', 'done') and blocks >= 4:

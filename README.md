@@ -54,10 +54,14 @@ Trigger by phrase (e.g. "push the ball to the goal", "push the ball to the wall"
 Each round the robot finds the ball and marks it, works out the goal↔ball line,
 drives to the point **behind** the ball on that line (`STANCE` on the BEV),
 creeps the last metre *along* the line so it arrives square, and shoves — then
-re-measures and repeats. Because every round is re-aimed from a fresh fix, a
-crooked shove is corrected by the next one instead of compounding, so it
-converges on the goal. The dashed amber line on the BEV is the push line; the
-robot stops and re-lines-up if the ball veers off it.
+re-measures and repeats. If it is **already behind** the ball but too close to
+line up, it can reverse slowly a short distance instead of turning around twice.
+It only does so when it is facing the goal, near the push line, and fresh 360°
+lidar shows the rear path clear; otherwise it uses the normal planner to get
+behind the ball. **The actual push is always forward.** Because every round is
+re-aimed from a fresh fix, a crooked shove is corrected by the next one instead
+of compounding. The dashed amber line on the BEV is the push line; the robot
+stops and re-lines-up if the ball veers off it.
 
 Returns `at goal` / `stalled` (jammed) / `lost` / `blocked` / `no-goal`.
 
@@ -65,7 +69,8 @@ Returns `at goal` / `stalled` (jammed) / `lost` / `blocked` / `no-goal`.
 > ball was pushed to the marked goal. The line-up + shove loop is also exercised
 > closed-loop in `tests/test_push_to_goal.py` (a simulated base that rolls the
 > ball), which is the fast way to check a change to the geometry or the push
-> controller without undocking.
+> controller without undocking. **The new reverse repositioning is only
+> simulation-tested; first try it on the robot in an open, supervised space.**
 
 ## Running it (on the Pi)
 
@@ -114,7 +119,7 @@ imported for real, then driven against a simulated base:
 
 ```bash
 pip install -r requirements.txt
-python3 tests/test_push_to_goal.py          # 23 tests, ~3 min (real-time sim)
+python3 tests/test_push_to_goal.py          # offline + real-time closed-loop tests (~3 min)
 python3 toyscript.py programs/push_ball_to_goal.toy   # DSL + MockRobot smoke run
 ```
 
