@@ -71,6 +71,15 @@ PUSH_WALL_V        = 0.16 # m/s forward while pushing the ball to the wall
 PUSH_WALL_STEER    = 1.4  # rad/s of yaw per rad of ball bearing (keep ball centred)
 PUSH_WALL_ESCAPE   = 0.60 # rad (~34deg) — ball bearing past this = escaped sideways
 PUSH_WALL_STANDOFF = 0.55 # m behind the ball for the forward-loop reposition
+# PUSH_AWAY: use A* only while FAR from the ball, then track it live with the
+# camera instead of navigating to a frozen point at the ball's old location.
+PUSH_AWAY_NAV_DIST = 1.15 # m — farther away, approach to a safe standoff with A*
+PUSH_AWAY_STANDOFF = 0.70 # m — planner goal short of the ball (plus GOAL_TOL)
+PUSH_AWAY_CONTACT = 0.30  # m — robot/ball centre distance at physical contact
+PUSH_AWAY_MAX_DRIVE = 1.20 # m — maximum forward travel per camera-steered segment
+PUSH_AWAY_BLIND = 0.30    # m — maximum straight travel after losing a close, centred ball
+PUSH_AWAY_DET_AGE = 1.5  # s — refuse a stale camera detection
+PUSH_AWAY_SCAN_AGE = 1.5 # s — refuse a far approach without fresh lidar
 # Push-the-ball-to-a-HUMAN-SET-goal (PUSH_TO_GOAL). The robot lines up on the
 # goal↔ball line BEHIND the ball, then shoves it along that line, re-lining-up
 # after every nudge — so it converges on the goal instead of drifting off it.
@@ -187,6 +196,7 @@ _state = {
     "plan":               [],   # [{phrase,verb}] the matched program will carry out
     # On-camera YOLO (OAK-D VPU) — spatial detections in robot-local frame
     "detections":         [],     # [{label, conf, x_loc, y_loc, dist, x_px, y_px, w_px, h_px}]
+    "det_t":              0.0,    # wall time of last NN result (even if empty)
     "cmd_sent":           None,   # last twist actually published {v, w, t} (recorder ground truth)
     "use_lidar_dist":     True,   # True: dist=min(OAK stereo, lidar@bearing); False: raw OAK
     "last_photo":         None,   # filename of the latest snapshot in PHOTO_DIR (UI thumbnail)
@@ -965,7 +975,7 @@ class NavNode(Node):
                 w_px=float(bs.x), h_px=float(bs.y),
                 color=(_detect_color(frame, x_px, y_px, w_px, h_px) if label != 'person' else None),
             ))
-        _set(detections=dets)
+        _set(detections=dets, det_t=time.time())
 
     def _odom_cb(self, msg: Odometry):
         p = msg.pose.pose
@@ -1462,11 +1472,11 @@ class NavRobot:
         if 'blocked' in s or 'stuck' in s or 'no path' in s: return 'blocked'
         return 'done'
 
-    def go_to(self, x, y):
+    def go_to(self, x, y, timeout=90):
         _set(goal_odom=(x, y), goal_mode='move', direct_goal=True, nav_active=True,
              path=[], goal_local=None, destination='', match_info='toyscript',
              status=f'navigating → ({x:.2f}, {y:.2f})')
-        return self._wait()
+        return self._wait(timeout=timeout)
 
     def push_to(self, x, y):
         _set(goal_odom=(x, y), goal_mode='push', direct_goal=True, nav_active=True,
@@ -1474,14 +1484,152 @@ class NavRobot:
              status=f'pushing → ({x:.2f}, {y:.2f})')
         return self._wait()
 
+    def _fresh_wall_ball(self):
+        """Live ball/apple detection for a wall shove, not an old NN snapshot."""
+        if time.time() - _get('det_t') > PUSH_AWAY_DET_AGE:
+            return None
+        det = self._live_det('ball')
+        if det is None:
+            return None
+        x, y, dist = det.get('x_loc'), det.get('y_loc'), det.get('dist')
+        if (x is None or y is None or dist is None or
+                not all(math.isfinite(n) for n in (x, y, dist)) or
+                x <= 0 or dist <= ROBOT_R):
+            return None
+        return det
+
     def push_away(self, bx, by, step=0.40):
-        """Push the ball toward the wall by driving (push mode) straight AT it.
-        The goal is the ball itself, NOT a point beyond it, so the robot stops
-        at the ball instead of sailing past to an empty point when the first
-        fix is off-axis; the program then re-finds and pushes again from close
-        range, where the bearing error is small. (`step` kept for the call
-        signature.)"""
-        return self.push_to(bx, by)
+        """Push the live ball a *bounded* distance away from the robot.
+
+        The old implementation sent A* to the ball's ONE-TIME (bx, by) fix.
+        Near the ball that goal is inside the target obstacle; with missing
+        lidar, no path, or depth error, SCAN_FOR could succeed yet the wheels
+        would never push. (bx, by) are retained for the ToyScript call signature,
+        but are never a drive target: the latest sighting decides where to go. Use A*
+        to approach only if distant, then keep the ball centred while shoving.
+        `step` is intended ball travel, not an ignored argument. Returns
+        'pushed' / 'at-feet' / 'pinned' / 'lost' / 'blocked'; a failed approach
+        is never mistaken for a push.
+        """
+        if not ros_node:
+            return 'no-robot'
+        try:
+            step = float(step)
+        except (TypeError, ValueError):
+            step = float('nan')
+        if not math.isfinite(step) or step <= 0:
+            _set(status='invalid wall-push distance — stopped')
+            return 'blocked'
+        step = min(step, 0.50)             # bound each shove, then re-find the ball
+        det = self._fresh_wall_ball()
+        if det is None:
+            self._jitter_find('ball', sweeps=2)
+            det = self._fresh_wall_ball()
+        if det is None:
+            _set(status='ball no longer visible — not pushing a stale location')
+            return 'lost'
+        if _get('docked') is True or time.time() - _get('odom_t') > 1.0:
+            _set(status='base unavailable for ball push — stopped')
+            return 'blocked'
+
+        # Far away, drive to a STANDOFF rather than driving through a frozen ball
+        # coordinate. The final approach below is short and uses fresh vision.
+        if det['dist'] > PUSH_AWAY_NAV_DIST:
+            if _get('scan') is None or time.time() - _get('scan_t') > PUSH_AWAY_SCAN_AGE:
+                _set(status='lidar unavailable for distant ball — cannot approach')
+                return 'blocked'
+            ox, oy = _get('odom_x'), _get('odom_y')
+            ball = self._ball_odom(det)
+            ratio = (det['dist'] - PUSH_AWAY_STANDOFF) / det['dist']
+            r = self.go_to(ox + (ball[0] - ox) * ratio,
+                           oy + (ball[1] - oy) * ratio, timeout=45)
+            if r != 'arrived':
+                _set(status='cannot approach ball: %s' % r)
+                return 'blocked'
+            det = self._fresh_wall_ball()
+            if det is None:
+                self._jitter_find('ball', sweeps=2)
+                det = self._fresh_wall_ball()
+            if det is None:
+                _set(status='ball lost after approach — stopped')
+                return 'lost'
+
+        if abs(math.atan2(det['y_loc'], det['x_loc'])) > 0.12:
+            self._center_ball('ball')
+            det = self._fresh_wall_ball()
+            if det is None or abs(math.atan2(det['y_loc'], det['x_loc'])) > 0.25:
+                _set(status='could not centre the ball — stopped')
+                return 'lost'
+        if det['dist'] > PUSH_AWAY_NAV_DIST:
+            _set(status='ball still too far for a short shove — stopped')
+            return 'blocked'
+
+        # Back of robot -> ball contact, then `step` of ball travel. If the
+        # camera loses a CLOSE, centred ball at the bumper, continue straight
+        # for at most PUSH_AWAY_BLIND; never do that for an off-axis/remote ball.
+        gap = max(0.0, det['dist'] - PUSH_AWAY_CONTACT)
+        drive = min(PUSH_AWAY_MAX_DRIVE, gap + step)
+        sx, sy = _get('odom_x'), _get('odom_y')
+        prog_x, prog_y = sx, sy
+        t0 = last_prog = time.time()
+        last_range = det['dist']
+        last_bearing = math.atan2(det['y_loc'], det['x_loc'])
+        blind_from = None
+        _set(goal_mode='push', goal_odom=None, path=[], goal_local=None,
+             status='pushing ball → wall (camera-tracked)')
+        try:
+            while time.time() - t0 < min(20.0, drive / PUSH_WALL_V * 2 + 3.0):
+                self._check()
+                if _get('docked') is True or any(h['type'] in ('cliff', 'wheel_drop', 'stall')
+                                                  for h in _get('hazards')):
+                    _set(status='wall push interrupted: hazard — stopped')
+                    return 'blocked'
+                if time.time() - _get('odom_t') > 1.0:
+                    _set(status='wall push interrupted: odometry stale — stopped')
+                    return 'blocked'
+                ox, oy = _get('odom_x'), _get('odom_y')
+                travelled = math.hypot(ox - sx, oy - sy)
+                det = self._fresh_wall_ball()
+                if det is not None:
+                    last_bearing = math.atan2(det['y_loc'], det['x_loc'])
+                    last_range = det['dist']
+                    if abs(last_bearing) > PUSH_WALL_ESCAPE:
+                        _set(status='ball escaped sideways — stopped')
+                        return 'lost'
+                    blind_from = None
+                    v = PUSH_WALL_V * max(0.3, 1.0 - abs(last_bearing))
+                    w = max(-0.8, min(0.8, PUSH_WALL_STEER * last_bearing))
+                else:
+                    if last_range > 0.65 or abs(last_bearing) > 0.18:
+                        _set(status='ball lost away from bumper — stopped')
+                        return 'lost'
+                    if blind_from is None:
+                        blind_from = travelled
+                    if travelled - blind_from >= PUSH_AWAY_BLIND:
+                        _set(status='ball at feet — stopped for short finish')
+                        return 'at-feet'
+                    v, w = PUSH_WALL_V, 0.0
+                if travelled >= drive:
+                    if det is not None and last_range > 0.55:
+                        _set(status='ball not in contact after approach — stopped')
+                        return 'lost'
+                    _set(status='shoved ball — re-finding')
+                    return 'at-feet' if blind_from is not None else 'pushed'
+                if math.hypot(ox - prog_x, oy - prog_y) > PROG_M:
+                    last_prog = time.time(); prog_x, prog_y = ox, oy
+                elif time.time() - last_prog > STALL_TIMEOUT:
+                    if travelled > gap + 0.05 and last_range < 0.55:
+                        _set(status='ball pinned at wall — stopped')
+                        return 'pinned'
+                    _set(status='wall push stalled before contact — stopped')
+                    return 'blocked'
+                ros_node.send_twist(v, w)
+                time.sleep(0.05)          # ~20 Hz meets Create 3 cmd_vel watchdog
+            _set(status='wall push timed out — stopped')
+            return 'blocked'
+        finally:
+            ros_node.send_twist(0.0, 0.0)
+            _set(goal_mode='move')
 
     def find(self, name):
         """Nearest current detection whose label matches `name`, as an odom point."""
@@ -1528,23 +1676,44 @@ class NavRobot:
         return self._scan_hit(name)
 
     def push_through(self, dist=0.7):
-        """Drive straight forward up to `dist`, stopping on no-progress (= wall
-        reached / can't move). Finishes a ball that has dropped below the camera
-        right in front of the robot, instead of rotating away to re-find it."""
+        """Short straight finish ONLY for a recently centred ball at our feet.
+        'pinned' needs actual movement followed by a jam; no movement from the
+        start (disabled wheels, cliff, etc.) is not proof the ball hit a wall.
+        """
         if not ros_node: return 'no-robot'
+        dist = max(0.0, min(float(dist), 0.8))
         sx, sy = _get('odom_x'), _get('odom_y')
-        _set(status='pushing → straight through')
-        t0 = last = time.time(); px, py = sx, sy
-        while math.hypot(_get('odom_x') - sx, _get('odom_y') - sy) < dist and time.time() - t0 < 12:
-            self._check()
-            ros_node.send_twist(PUSH_THROUGH_SPEED, 0.0); time.sleep(0.05)
-            cx, cy = _get('odom_x'), _get('odom_y')
-            if math.hypot(cx - px, cy - py) > 0.003: last = time.time()
-            elif time.time() - last > 2.0:
-                ros_node.send_twist(0.0, 0.0); return 'pinned'   # wall / can't move
-            px, py = cx, cy
-        ros_node.send_twist(0.0, 0.0)
-        return 'done'
+        px, py = sx, sy
+        t0 = last_prog = time.time()
+        _set(goal_mode='push', status='pushing → straight through')
+        try:
+            while time.time() - t0 < 12:
+                self._check()
+                if _get('docked') is True or any(h['type'] in ('cliff', 'wheel_drop', 'stall')
+                                                  for h in _get('hazards')):
+                    _set(status='straight push interrupted: hazard — stopped')
+                    return 'blocked'
+                if time.time() - _get('odom_t') > 1.0:
+                    _set(status='straight push interrupted: odometry stale — stopped')
+                    return 'blocked'
+                cx, cy = _get('odom_x'), _get('odom_y')
+                moved = math.hypot(cx - sx, cy - sy)
+                if moved >= dist:
+                    _set(status='straight push complete (wall not confirmed)')
+                    return 'done'
+                if math.hypot(cx - px, cy - py) > PROG_M:
+                    last_prog = time.time(); px, py = cx, cy
+                elif time.time() - last_prog > STALL_TIMEOUT:
+                    _set(status=('ball pinned at wall' if moved > 0.05 else
+                                 'straight push stalled before moving') + ' — stopped')
+                    return 'pinned' if moved > 0.05 else 'blocked'
+                ros_node.send_twist(PUSH_THROUGH_SPEED, 0.0)
+                time.sleep(0.05)
+            _set(status='straight push timed out — stopped')
+            return 'blocked'
+        finally:
+            ros_node.send_twist(0.0, 0.0)
+            _set(goal_mode='move')
 
     def _live_det(self, name):
         """Nearest current detection matching `name` (or apple, for a ball), in
@@ -2385,6 +2554,7 @@ def get_state():
         _hnow = time.time()
         resp = jsonify({
             'cam_ok':       (_hnow - _state['img_t'])  < 3.0,
+            'nn_ok':        (_hnow - _state['det_t'])  < 2.0,
             'lidar_ok':     (_hnow - _state['scan_t']) < 3.0,
             'base_ok':      (_hnow - _state['odom_t']) < 2.0,
             'destination':  _state['destination'],
@@ -2393,6 +2563,9 @@ def get_state():
             'nav_active':   _state['nav_active'],
             'goal_mode':    _state['goal_mode'],
             'detections':   _state['detections'],
+            'cmd_sent':     _state['cmd_sent'],  # last actual v/w + timestamp for motion debugging
+            'cmd_age_s':    (round(_hnow - _state['cmd_sent']['t'], 2)
+                             if _state['cmd_sent'] else None),
             'use_lidar_dist': _state['use_lidar_dist'],
             'planner':      {'robot_r': ROBOT_R, 'inflate_r': INFLATE_R,
                              'smooth_clear_m': SMOOTH_CLEAR_M},

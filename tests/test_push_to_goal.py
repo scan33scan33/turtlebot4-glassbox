@@ -179,12 +179,12 @@ class FakeBase:
         bearing = math.atan2(ly, lx)
         visible = d < 4.0 and lx > 0.0 and abs(bearing) < self.FOV_HALF
         if not visible:
-            tb4._set(detections=[])
+            tb4._set(detections=[], det_t=time.time())
             return
         tb4._set(detections=[dict(label='sports ball', conf=0.92, x_loc=lx, y_loc=ly,
                                   dist=d, cam_dist=d, lidar_dist=None, p25_dist=d,
                                   x_px=208.0, y_px=250.0, w_px=24.0, h_px=24.0,
-                                  color=None)])
+                                  color=None)], det_t=time.time())
 
     def _serve_nav(self):
         """nav_loop stand-in: drive toward goal_odom, report arrival like it does."""

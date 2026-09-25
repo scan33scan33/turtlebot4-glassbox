@@ -112,7 +112,8 @@
     <div class="stat-row"><span>Yaw</span><span id="ryaw">0.0°</span></div>
     <div class="battery" id="battery"><strong>Battery:</strong> <span id="batt_pct">—</span>% | <span id="batt_volt">—</span>V</div>
     <div class="stat-row"><span>Dock</span><span id="dock_disp">—</span></div>
-    <div class="stat-row"><span>Health</span><span id="health_disp" style="font-weight:bold;"><span id="h_cam">●</span> cam <span id="h_lidar">●</span> lidar <span id="h_base">●</span> base</span></div>
+    <div class="stat-row"><span>Health</span><span id="health_disp" style="font-weight:bold;"><span id="h_cam">●</span> cam <span id="h_nn">●</span> detector <span id="h_lidar">●</span> lidar <span id="h_base">●</span> base</span></div>
+    <div class="stat-row"><span>Last /cmd_vel</span><span id="cmd_disp">—</span></div>
     <button class="btn btn-undock" id="undock_btn" onclick="undock()">Undock</button>
     <button class="btn btn-dock" id="dock_btn" onclick="dock()">Dock</button>
     <hr class="sep">
@@ -202,7 +203,10 @@ function update() {
     document.getElementById('dock_btn').disabled   = s.dock_busy || s.docked === true;
     document.getElementById('undock_btn').disabled = s.dock_busy || s.docked === false;
     const hdot = (id, ok) => { const e = document.getElementById(id); if (e) e.style.color = ok ? '#4a9' : '#a44'; };
-    hdot('h_cam', s.cam_ok); hdot('h_lidar', s.lidar_ok); hdot('h_base', s.base_ok);
+    hdot('h_cam', s.cam_ok); hdot('h_nn', s.nn_ok); hdot('h_lidar', s.lidar_ok); hdot('h_base', s.base_ok);
+    const cmd = s.cmd_sent;
+    document.getElementById('cmd_disp').textContent = (cmd && s.cmd_age_s < 1.5) ?
+      `v ${cmd.v.toFixed(2)} m/s · ω ${cmd.w.toFixed(2)} rad/s` : '—';
     const el = document.getElementById('status');
     el.textContent = s.status; 
     el.className = s.status.split(' ')[0];
@@ -275,8 +279,11 @@ function update() {
     var ch = document.getElementById('cmd_history');
     if (ch) {
       ch.innerHTML = (s.cmd_history||[]).map(function(c){
-        var icon = c.running ? '<span style="color:#dd6">▶</span>' : '<span style="color:#6c6">✓</span>';
-        var res  = c.running ? '<span style="color:#dd6">…running</span>' : '<span style="color:#9c9">'+(c.result||'')+'</span>';
+        var failed = /^(blocked|lost|timeout|stalled|no-robot|no-goal)$/i.test(c.result||'');
+        var icon = c.running ? '<span style="color:#dd6">▶</span>' :
+                   failed ? '<span style="color:#e66">✕</span>' : '<span style="color:#6c6">✓</span>';
+        var res  = c.running ? '<span style="color:#dd6">…running</span>' :
+                   '<span style="color:'+(failed ? '#e66' : '#9c9')+'">'+(c.result||'')+'</span>';
         return '<div>'+icon+' '+c.cmd+' <span style="color:#888">&rarr;</span> '+res+'</div>';
       }).join('');
     }

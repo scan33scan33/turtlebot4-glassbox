@@ -6,8 +6,8 @@
 #   - GOAL  = the wall behind the ball, from LIDAR (stable, doesn't jitter)
 #   - STEER = keep the live ball centred, from the CAMERA
 #   - DONE  = stalled near the wall-goal (ball pinned at the wall)
-#   - if the ball escapes sideways, drive FORWARD to a standoff behind it
-#     (the Create 3 can't reverse) and push again.
+#   - if the ball escapes sideways, route around to a standoff behind it;
+#     reversing into an off-axis ball would push it the wrong way.
 
 SET ball = SCAN_FOR("ball", 360)
 IF ball != NONE THEN
