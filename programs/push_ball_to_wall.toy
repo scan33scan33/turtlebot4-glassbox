@@ -3,60 +3,75 @@
 # triggers: push the ball to the wall, push the ball, move the ball to the wall, ball to the wall, clear the ball away
 # plan: locate the ball (scan)@SCAN_FOR | look again to lock it@FIND | approach & push the ball@PUSH_AWAY | finish push to the wall@PUSH_THROUGH
 #
-# Strategy (v3): rotate to FIND the ball (SCAN_FOR) — which puts the robot
-# behind it automatically — then shove it straight AWAY from the robot
-# (PUSH_AWAY) in bounded steps until it pins against a wall (stall). No fixed
-# goal, no manual positioning: just drop the ball between the robot and the
-# target wall and run.
+# Step-and-stare finds and centres the ball. PUSH_AWAY uses the planner only
+# when it is far away; close up it follows the LIVE camera bearing for a short
+# shove, then stops to re-find it. Only finish blind when PUSH_AWAY has just
+# confirmed a centred ball disappearing at our feet. A failed approach or a
+# ball escaping to the side must NOT be treated as success or pushed blindly.
 
 SET push_seg = 0.40
-
-# 1. Rotate slowly; stop the instant a ball comes into view.
 SET ball = SCAN_FOR("ball", 360)
 
 IF ball != NONE THEN
-    # stop ~1s and locate the ball again for a clean, settled fix before pushing
-    PRINT "Found the ball — stopping to locate it again."
-    WAIT(1.0)
+    PRINT "Found the ball — getting a fresh fix before pushing."
+    WAIT(0.2)
     SET fresh = FIND("ball")
     IF fresh == NONE THEN
         SET fresh = FIND("apple")
     END
     IF fresh != NONE THEN
         SET ball = fresh
+    ELSE
+        PRINT "Camera flickered; will reacquire before moving."
     END
-    PRINT "Pushing it to the wall."
     SET bx = ball.x
     SET by = ball.y
     SET done = NONE
+    SET r = NONE
     SET tries = 0
     WHILE done == NONE AND tries < 14 DO
         SET tries = tries + 1
-        # 2. shove the ball straight away from the robot
         SET r = PUSH_AWAY(bx, by, push_seg)
-        IF r == "stalled" THEN
-            PRINT "ball pinned against the wall — done!"
+        IF r == "pinned" THEN
+            PRINT "Ball pinned against the wall."
             SET done = 1
         ELSE
-            # 3. re-acquire WITHOUT rotating away — the ball is still ahead of us
-            WAIT(0.3)
-            SET ball = FIND("ball")
-            IF ball == NONE THEN
-                SET ball = FIND("apple")
-            END
-            IF ball == NONE THEN
-                # ball dropped below the low camera right at our feet — finish
-                # the job by driving straight through to the wall
-                PRINT "ball is at our feet — pushing straight through to the wall."
+            IF r == "at-feet" THEN
+                PRINT "Ball centred at our feet — finishing straight ahead."
                 SET r = PUSH_THROUGH(0.7)
+                IF r == "done" THEN
+                    PRINT "Finished the short straight push; wall contact was not confirmed."
+                END
                 SET done = 1
             ELSE
-                SET bx = ball.x
-                SET by = ball.y
+                IF r == "pushed" THEN
+                    WAIT(0.3)
+                    SET ball = FIND("ball")
+                    IF ball == NONE THEN
+                        SET ball = FIND("apple")
+                    END
+                    IF ball == NONE THEN
+                        PRINT "Lost the ball after a shove — stopping instead of driving blind."
+                        SET r = "lost"
+                        SET done = 1
+                    ELSE
+                        SET bx = ball.x
+                        SET by = ball.y
+                    END
+                ELSE
+                    PRINT "Push stopped before reaching the wall:"
+                    PRINT r
+                    SET done = 1
+                END
             END
         END
     END
-    PRINT "Done."
+    IF done == NONE THEN
+        PRINT "Stopped after 14 shoves; wall not confirmed."
+        SET r = "timeout"
+    END
+    PRINT "Result:"
+    PRINT r
 ELSE
     PRINT "No ball found in the room."
 END
